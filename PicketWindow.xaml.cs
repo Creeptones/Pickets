@@ -332,8 +332,6 @@ public partial class PicketWindow : Window
 
     private List<PicketWindow> ComputeTouchingCluster()
     {
-        const double TOL = 4.0;  // snap leaves edges flush, but allow a few px for float drift
-
         var cluster = new List<PicketWindow> { this };
         if (Application.Current is not App app) return cluster;
         var pool = app.Pickets.ToList();
@@ -346,7 +344,7 @@ public partial class PicketWindow : Window
             foreach (var g in pool)
             {
                 if (cluster.Contains(g)) continue;
-                if (Touches(f, g, TOL))
+                if (AreGrouped(f, g))
                 {
                     cluster.Add(g);
                     queue.Enqueue(g);
@@ -356,18 +354,26 @@ public partial class PicketWindow : Window
         return cluster;
     }
 
-    private static bool Touches(PicketWindow a, PicketWindow b, double tol)
+    // Pickets within this many px of each other (or overlapping) count as one group and drag
+    // together. Looser than requiring flush edges, so a stacked column or an overlapping pile still
+    // moves as a unit. Kept below the unlink push (SHIFT) so "unlink" can still break a group apart.
+    private const double GROUP_GAP = 20.0;
+
+    /// <summary>True when two pickets belong to the same drag group: they form a column (overlap
+    /// horizontally, within GROUP_GAP vertically), a row (overlap vertically, within GROUP_GAP
+    /// horizontally), or simply overlap. Pure diagonal-corner neighbors do NOT group.</summary>
+    private static bool AreGrouped(PicketWindow a, PicketWindow b)
     {
         double aL = a.Left, aR = a.Left + a.Width, aT = a.Top, aB = a.Top + a.Height;
         double bL = b.Left, bR = b.Left + b.Width, bT = b.Top, bB = b.Top + b.Height;
 
-        bool xRangesOverlap = aL < bR + tol && bL < aR + tol;
-        bool yRangesOverlap = aT < bB + tol && bT < aB + tol;
-        bool sharedVerticalEdge   = Math.Abs(aR - bL) <= tol || Math.Abs(aL - bR) <= tol;
-        bool sharedHorizontalEdge = Math.Abs(aB - bT) <= tol || Math.Abs(aT - bB) <= tol;
+        bool xOverlap = aL < bR && bL < aR;
+        bool yOverlap = aT < bB && bT < aB;
+        bool xNear    = aL < bR + GROUP_GAP && bL < aR + GROUP_GAP;
+        bool yNear    = aT < bB + GROUP_GAP && bT < aB + GROUP_GAP;
 
-        return (sharedVerticalEdge && yRangesOverlap)
-            || (sharedHorizontalEdge && xRangesOverlap);
+        // Column (x overlaps, y close), row (y overlaps, x close), or overlapping pile.
+        return (xOverlap && yNear) || (yOverlap && xNear);
     }
 
     // === Title context menu ===
@@ -423,7 +429,7 @@ public partial class PicketWindow : Window
         foreach (var other in app.Pickets)
         {
             if (other == this) continue;
-            if (Touches(this, other, 4.0)) return true;
+            if (AreGrouped(this, other)) return true;
         }
         return false;
     }
