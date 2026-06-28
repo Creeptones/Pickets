@@ -21,6 +21,20 @@ public class LayoutFile
     /// were last saved under the previous active profile, so the laptop layout starts as a
     /// sensible copy of the desktop layout rather than an empty canvas.</summary>
     public List<PicketState>? LastProfileSeed { get; set; }
+
+    /// <summary>Per-picket look (color, transparency, blur) shared across ALL display profiles,
+    /// keyed by picket Title. Positions stay per-display, but a picket looks the same everywhere.
+    /// Absent in older files; seeded from the first profile loaded after the upgrade.</summary>
+    public Dictionary<string, PicketAppearance> Appearances { get; set; } = new();
+}
+
+/// <summary>A picket's visual style, kept global (shared by every display profile).</summary>
+public class PicketAppearance
+{
+    public string ColorKey { get; set; } = "stone";
+    public string TransparencyKey { get; set; } = "solid";
+    public int TransparencyCustomPercent { get; set; } = 50;
+    public bool BlurEnabled { get; set; }
 }
 
 public class PicketState

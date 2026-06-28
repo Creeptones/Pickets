@@ -438,6 +438,7 @@ public partial class App : Application
 
     private PicketWindow SpawnPicket(PicketState state)
     {
+        ApplyGlobalAppearance(state);
         var picket = new PicketWindow(state);
         picket.LayoutChanged += (_, _) => MarkDirty();
         picket.Show();
@@ -447,11 +448,42 @@ public partial class App : Application
         return picket;
     }
 
+    /// <summary>Makes a picket's look follow it across every display. If the shared map already has
+    /// an entry for this title, the picket adopts it; otherwise the picket's own saved look seeds the
+    /// map. Only color/transparency/blur are shared -- position and contents stay per-display.</summary>
+    private void ApplyGlobalAppearance(PicketState state)
+    {
+        if (_layout.Appearances.TryGetValue(state.Title, out var look))
+        {
+            state.ColorKey = look.ColorKey;
+            state.TransparencyKey = look.TransparencyKey;
+            state.TransparencyCustomPercent = look.TransparencyCustomPercent;
+            state.BlurEnabled = look.BlurEnabled;
+        }
+        else
+        {
+            _layout.Appearances[state.Title] = LookOf(state);
+        }
+    }
+
+    private static PicketAppearance LookOf(PicketState s) => new()
+    {
+        ColorKey = s.ColorKey,
+        TransparencyKey = s.TransparencyKey,
+        TransparencyCustomPercent = s.TransparencyCustomPercent,
+        BlurEnabled = s.BlurEnabled,
+    };
+
     private void SaveLayout()
     {
         // Persist only the active profile -- other profiles in _layout remain untouched.
-        _layout.Profiles[_activeProfile] = _pickets.Select(f => f.ToState()).ToList();
-        _layout.LastProfileSeed = _layout.Profiles[_activeProfile];
+        var states = _pickets.Select(f => f.ToState()).ToList();
+        _layout.Profiles[_activeProfile] = states;
+        _layout.LastProfileSeed = states;
+        // Appearance is global: each picket's current look updates the shared, per-title map so the
+        // same color/transparency/blur shows on every display the next time that profile loads.
+        foreach (var s in states)
+            _layout.Appearances[s.Title] = LookOf(s);
         LayoutStore.Save(_layout);
     }
 
