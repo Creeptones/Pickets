@@ -7,8 +7,8 @@ namespace Pickets;
 /// <summary>
 /// Raises <see cref="Restarted"/> when Explorer relaunches. Explorer broadcasts the registered
 /// "TaskbarCreated" message to every top-level window when its shell comes back up (taskbar/Explorer
-/// crash, or a manual restart). Pickets listens so it can re-attach its fences to the freshly
-/// spawned WorkerW -- without this, an Explorer restart orphans the fences and they stay invisible
+/// crash, or a manual restart). Pickets listens so it can re-attach its pickets to the freshly
+/// spawned WorkerW -- without this, an Explorer restart orphans the pickets and they stay invisible
 /// until the app is manually relaunched.
 ///
 /// A message-only (HWND_MESSAGE) window is deliberately NOT used here: broadcast messages are only

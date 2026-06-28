@@ -15,18 +15,18 @@ public class LayoutFile
 
     /// <summary>Keyed by DisplayProfile.CurrentKey(). A missing key means "never saved for this
     /// display arrangement" -- the app seeds it from the most recently used profile.</summary>
-    public Dictionary<string, List<FenceState>> Profiles { get; set; } = new();
+    public Dictionary<string, List<PicketState>> Profiles { get; set; } = new();
 
-    /// <summary>Fallback seed used when a brand-new profile is first seen. Holds the fences that
+    /// <summary>Fallback seed used when a brand-new profile is first seen. Holds the pickets that
     /// were last saved under the previous active profile, so the laptop layout starts as a
     /// sensible copy of the desktop layout rather than an empty canvas.</summary>
-    public List<FenceState>? LastProfileSeed { get; set; }
+    public List<PicketState>? LastProfileSeed { get; set; }
 }
 
-public class FenceState
+public class PicketState
 {
     public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Title { get; set; } = "Fence";
+    public string Title { get; set; } = "Picket";
     public double X { get; set; } = 200;
     public double Y { get; set; } = 200;
     public double Width { get; set; } = 420;
@@ -36,7 +36,7 @@ public class FenceState
     public string TransparencyKey { get; set; } = "solid";
     public int TransparencyCustomPercent { get; set; } = 50;
 
-    /// <summary>When set, this fence mirrors the named folder instead of holding manual items.
+    /// <summary>When set, this picket mirrors the named folder instead of holding manual items.
     /// Items are rebuilt from the folder on each launch -- we persist only the folder path.</summary>
     public string? PortalPath { get; set; }
 
@@ -95,7 +95,7 @@ public static class LayoutStore
         }
     }
 
-    /// <summary>V1 had a flat top-level "Fences" array; V2 keys every fence list under a
+    /// <summary>V1 had a flat top-level "Fences" array; V2 keys every picket list under a
     /// display-profile string. Detect the version and migrate in memory so the user's existing
     /// layout.json keeps working. The migrated list is stored under "_legacy" and used as the
     /// seed for whichever profile is active on the first V2 launch.</summary>
@@ -113,20 +113,20 @@ public static class LayoutStore
             return JsonSerializer.Deserialize<LayoutFile>(json, Options);
         }
 
-        // V1 migration: wrap the legacy Fences list under a sentinel profile key.
-        var legacyFences = obj["Fences"]?.Deserialize<List<FenceState>>(Options) ?? new();
+        // V1 migration: wrap the legacy Pickets list under a sentinel profile key.
+        var legacyPickets = obj["Fences"]?.Deserialize<List<PicketState>>(Options) ?? new();
         return new LayoutFile
         {
             Version = 2,
-            Profiles = new Dictionary<string, List<FenceState>> { ["_legacy"] = legacyFences },
-            LastProfileSeed = legacyFences,
+            Profiles = new Dictionary<string, List<PicketState>> { ["_legacy"] = legacyPickets },
+            LastProfileSeed = legacyPickets,
         };
     }
 
-    /// <summary>Returns the fence list for the current profile, creating it from the last-used
+    /// <summary>Returns the picket list for the current profile, creating it from the last-used
     /// seed (or legacy V1 data) on first encounter. The returned list is stored back into
     /// layout.Profiles under profileKey so future reads stay cheap.</summary>
-    public static List<FenceState> GetOrSeedProfile(LayoutFile layout, string profileKey)
+    public static List<PicketState> GetOrSeedProfile(LayoutFile layout, string profileKey)
     {
         if (layout.Profiles.TryGetValue(profileKey, out var existing))
             return existing;
@@ -138,7 +138,7 @@ public static class LayoutStore
 
         var fresh = seed != null
             ? seed.Select(CloneWithNewId).ToList()
-            : new List<FenceState> { new FenceState { Title = "Fence", X = 200, Y = 200, Width = 420, Height = 320 } };
+            : new List<PicketState> { new PicketState { Title = "Picket", X = 200, Y = 200, Width = 420, Height = 320 } };
 
         foreach (var s in fresh)
             DisplayProfile.ClampToVisibleWorkArea(s);
@@ -147,10 +147,10 @@ public static class LayoutStore
         return fresh;
     }
 
-    /// <summary>Clone a FenceState while giving it a new Id -- two profiles must not share fence
+    /// <summary>Clone a PicketState while giving it a new Id -- two profiles must not share picket
     /// identities or independent edits on one profile will collide with the other through the
     /// Id field used as a dictionary key in-process.</summary>
-    private static FenceState CloneWithNewId(FenceState src) => new()
+    private static PicketState CloneWithNewId(PicketState src) => new()
     {
         Id = Guid.NewGuid().ToString(),
         Title = src.Title,
@@ -190,9 +190,9 @@ public static class LayoutStore
 
     private static LayoutFile DefaultLayout()
     {
-        var seed = new List<FenceState>
+        var seed = new List<PicketState>
         {
-            new FenceState { Title = "Fence", X = 200, Y = 200, Width = 420, Height = 320 }
+            new PicketState { Title = "Picket", X = 200, Y = 200, Width = 420, Height = 320 }
         };
         return new LayoutFile { LastProfileSeed = seed };
     }

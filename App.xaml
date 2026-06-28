@@ -8,8 +8,8 @@
             Unified dark chrome for context menus, shared by the title menu, item menus, and
             label menu. Matches the tooltip pill style (#F01E1E1E + white text + rounded 4px)
             so the app's secondary UI reads as a single visual language regardless of which
-            fence color the user picked. Lives in App.xaml so every ContextMenu instance in
-            every fence picks it up automatically; no per-menu tagging required.
+            picket color the user picked. Lives in App.xaml so every ContextMenu instance in
+            every picket picks it up automatically; no per-menu tagging required.
         -->
 
         <!-- Shared palette. Defined as resources so a future dark/light toggle only needs to
@@ -30,7 +30,7 @@
 
         <!-- ContextMenu: rounded dark pill wrapper. Padding=4 keeps items from kissing the
              border; HasDropShadow adds a subtle elevation so the menu reads as floating rather
-             than painted onto the fence. -->
+             than painted onto the picket. -->
         <Style TargetType="ContextMenu">
             <Setter Property="Background"      Value="{StaticResource MenuBackgroundBrush}"/>
             <Setter Property="BorderBrush"     Value="{StaticResource MenuBorderBrush}"/>
@@ -48,7 +48,7 @@
                                 Padding="{TemplateBinding Padding}"
                                 Margin="6">
                             <!-- Soft shadow gives the menu a sense of elevation against both
-                                 the fence and the wallpaper; Margin=6 on the Border leaves room
+                                 the picket and the wallpaper; Margin=6 on the Border leaves room
                                  for the blur to render without being clipped by the Popup bounds. -->
                             <Border.Effect>
                                 <DropShadowEffect Color="#000000" BlurRadius="12" ShadowDepth="2" Opacity="0.45"/>

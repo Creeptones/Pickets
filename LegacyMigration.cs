@@ -6,7 +6,7 @@ namespace Pickets;
 
 /// <summary>
 /// One-time, non-destructive migration from the project's former name ("DesktopFences") to "Pickets".
-/// Carries the user's saved fence layout and run-at-login preference across the rename so an in-place
+/// Carries the user's saved picket layout and run-at-login preference across the rename so an in-place
 /// upgrade doesn't look like a fresh, empty install. Safe to run on every launch: each step becomes a
 /// no-op once the Pickets-side state exists. Best-effort -- never throws into startup.
 /// </summary>

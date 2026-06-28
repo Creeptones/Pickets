@@ -1,4 +1,4 @@
-<Window x:Class="Pickets.FenceWindow"
+<Window x:Class="Pickets.PicketWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Pickets"
@@ -8,7 +8,7 @@
         ShowInTaskbar="False"
         ResizeMode="NoResize"
         MinWidth="160" MinHeight="40"
-        Title="Fence"
+        Title="Picket"
         UseLayoutRounding="True">
     <Window.Resources>
         <ContextMenu x:Key="ItemContextMenu">
@@ -17,14 +17,14 @@
             <MenuItem Header="Large icon (2x2)" Tag="LargeToggle" IsCheckable="True" Click="ItemMenu_ToggleLarge_Click"/>
             <Separator/>
             <MenuItem Header="Insert label above..." Click="ItemMenu_InsertLabelAbove_Click"/>
-            <MenuItem Header="Remove from fence (restore icon)" Click="ItemMenu_Remove_Click"/>
+            <MenuItem Header="Remove from picket (restore icon)" Click="ItemMenu_Remove_Click"/>
         </ContextMenu>
         <ContextMenu x:Key="LabelContextMenu">
             <MenuItem Header="Rename label..." Click="LabelMenu_Rename_Click"/>
             <MenuItem Header="Remove label" Click="LabelMenu_Remove_Click"/>
         </ContextMenu>
         <ContextMenu x:Key="TitleContextMenu">
-            <MenuItem Header="Rename fence..." Click="TitleMenu_Rename_Click"/>
+            <MenuItem Header="Rename picket..." Click="TitleMenu_Rename_Click"/>
             <MenuItem Header="Roll up / down" Click="TitleMenu_ToggleCollapse_Click"/>
             <MenuItem Header="Color" Tag="ColorMenu">
                 <MenuItem Header="White" Tag="white" IsCheckable="True" Click="TitleMenu_SetColor_Click">
@@ -112,17 +112,17 @@
             <MenuItem Header="Open folder in Explorer" Tag="OpenPortalFolder" Click="TitleMenu_OpenPortalFolder_Click"/>
             <MenuItem Header="Disconnect portal" Tag="DisconnectPortal" Click="TitleMenu_DisconnectPortal_Click"/>
             <Separator/>
-            <MenuItem Header="New fence here" Click="TitleMenu_NewFence_Click"/>
-            <MenuItem Header="Delete this fence" Click="TitleMenu_DeleteFence_Click"/>
+            <MenuItem Header="New picket here" Click="TitleMenu_NewPicket_Click"/>
+            <MenuItem Header="Delete this picket" Click="TitleMenu_DeletePicket_Click"/>
             <MenuItem Header="Clean up missing items" Click="TitleMenu_CleanMissing_Click"/>
             <Separator/>
-            <MenuItem Header="Hide / show all fences (Ctrl+Alt+D or double-click desktop)" Click="TitleMenu_HideAll_Click"/>
+            <MenuItem Header="Hide / show all pickets (Ctrl+Alt+D or double-click desktop)" Click="TitleMenu_HideAll_Click"/>
             <MenuItem Header="Launch at login" Tag="LaunchAtLogin" IsCheckable="True" Click="TitleMenu_ToggleLaunchAtLogin_Click"/>
             <MenuItem Header="Restore all icons and quit" Click="TitleMenu_RestoreAll_Click"/>
             <MenuItem Header="Quit Pickets" Click="TitleMenu_Quit_Click"/>
         </ContextMenu>
 
-        <!-- Tooltips need a solid background; default semi-transparent styling over a blurred fence
+        <!-- Tooltips need a solid background; default semi-transparent styling over a blurred picket
              becomes unreadable against wallpaper. Dark pill + light text works on any color scheme. -->
         <Style TargetType="ToolTip">
             <Setter Property="Background" Value="#F01E1E1E"/>
@@ -169,7 +169,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="TitleText"
                                    Grid.Column="0"
-                                   Text="Fence"
+                                   Text="Picket"
                                    Foreground="#2C2C2C"
                                    VerticalAlignment="Center"
                                    Margin="12,0,4,0"
@@ -212,19 +212,19 @@
                                 </Border.Style>
                                 <TextBlock Text="&#xE71B;"
                                            FontFamily="Segoe MDL2 Assets"
-                                           Foreground="{DynamicResource FenceItemForeground}"
+                                           Foreground="{DynamicResource PicketItemForeground}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
                                            FontSize="12"/>
                             </Border>
-                            <Border x:Name="AddFenceBtn"
+                            <Border x:Name="AddPicketBtn"
                                     Width="22" Height="22"
                                     VerticalAlignment="Center"
                                     CornerRadius="4"
                                     Background="Transparent"
                                     Cursor="Hand"
-                                    ToolTip="New fence"
-                                    MouseLeftButtonDown="AddFenceBtn_MouseLeftButtonDown">
+                                    ToolTip="New picket"
+                                    MouseLeftButtonDown="AddPicketBtn_MouseLeftButtonDown">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Style.Triggers>
@@ -235,7 +235,7 @@
                                     </Style>
                                 </Border.Style>
                                 <TextBlock Text="+"
-                                           Foreground="{DynamicResource FenceItemForeground}"
+                                           Foreground="{DynamicResource PicketItemForeground}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
                                            FontSize="16"
@@ -269,8 +269,8 @@
                                         ToolTip="{Binding Path}">
                                     <Border.Style>
                                         <!-- Base: fully transparent. Hover adds a faint darken that reads on
-                                             both light and dark fence schemes. Selection uses a translucent
-                                             accent fill + matching border so the wallpaper/fence color still
+                                             both light and dark picket schemes. Selection uses a translucent
+                                             accent fill + matching border so the wallpaper/picket color still
                                              shows through the highlight. -->
                                         <Style TargetType="Border">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -292,17 +292,17 @@
                                                HorizontalAlignment="Center"
                                                Margin="0,2,0,4"/>
                                         <TextBlock Text="{Binding DisplayName}"
-                                                   Foreground="{DynamicResource FenceItemForeground}"
+                                                   Foreground="{DynamicResource PicketItemForeground}"
                                                    TextWrapping="Wrap"
                                                    TextAlignment="Center"
                                                    FontSize="11"
                                                    MaxHeight="32"
                                                    TextTrimming="CharacterEllipsis">
                                             <!-- Soft halo behind the label so it stays readable on any wallpaper,
-                                                 even when the fence body fades toward the desktop behind it. -->
+                                                 even when the picket body fades toward the desktop behind it. -->
                                             <TextBlock.Effect>
                                                 <DropShadowEffect ShadowDepth="0" BlurRadius="3" Opacity="1"
-                                                                  Color="{DynamicResource FenceItemShadowColor}"/>
+                                                                  Color="{DynamicResource PicketItemShadowColor}"/>
                                             </TextBlock.Effect>
                                         </TextBlock>
                                     </StackPanel>
@@ -319,18 +319,18 @@
                                         Cursor="Hand"
                                         ContextMenu="{StaticResource LabelContextMenu}">
                                     <TextBlock Text="{Binding LabelText}"
-                                               Foreground="{DynamicResource FenceItemForeground}"
+                                               Foreground="{DynamicResource PicketItemForeground}"
                                                FontWeight="SemiBold"
                                                FontSize="11"
                                                TextTrimming="CharacterEllipsis">
                                         <TextBlock.Effect>
                                             <DropShadowEffect ShadowDepth="0" BlurRadius="3" Opacity="1"
-                                                              Color="{DynamicResource FenceItemShadowColor}"/>
+                                                              Color="{DynamicResource PicketItemShadowColor}"/>
                                         </TextBlock.Effect>
                                     </TextBlock>
                                 </Border>
                             </DataTemplate>
-                            <local:FenceItemTemplateSelector x:Key="ItemSelector"
+                            <local:PicketItemTemplateSelector x:Key="ItemSelector"
                                                              FileTemplate="{StaticResource FileItemTemplate}"
                                                              LabelTemplate="{StaticResource LabelItemTemplate}"/>
                         </ItemsControl.Resources>

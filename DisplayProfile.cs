@@ -7,9 +7,9 @@ namespace Pickets;
 
 /// <summary>
 /// Builds a stable key describing the current monitor arrangement (resolution + virtual-screen
-/// position of each physical monitor) so fence layouts can be saved per-profile. When the user
-/// streams in via Parsec at 1920x1200, the key changes, and a separate fence layout loads --
-/// fences saved at 4K coordinates no longer end up off-screen on the laptop canvas.
+/// position of each physical monitor) so picket layouts can be saved per-profile. When the user
+/// streams in via Parsec at 1920x1200, the key changes, and a separate picket layout loads --
+/// pickets saved at 4K coordinates no longer end up off-screen on the laptop canvas.
 /// </summary>
 internal static class DisplayProfile
 {
@@ -47,16 +47,16 @@ internal static class DisplayProfile
         return list;
     }
 
-    /// <summary>Clamps a fence's position+size so that it lies within some monitor's work area.
-    /// If the fence's current monitor has vanished (Parsec dropped a screen, resolution shrank),
-    /// the fence is relocated to the primary work area with its size shrunk to fit.</summary>
-    public static void ClampToVisibleWorkArea(FenceState s)
+    /// <summary>Clamps a picket's position+size so that it lies within some monitor's work area.
+    /// If the picket's current monitor has vanished (Parsec dropped a screen, resolution shrank),
+    /// the picket is relocated to the primary work area with its size shrunk to fit.</summary>
+    public static void ClampToVisibleWorkArea(PicketState s)
     {
         var monitors = EnumerateWorkAreas();
         if (monitors.Count == 0) return;
 
-        // Prefer the monitor whose work area currently contains the fence's top-left. If none does
-        // (fence is fully off-screen), pick the primary.
+        // Prefer the monitor whose work area currently contains the picket's top-left. If none does
+        // (picket is fully off-screen), pick the primary.
         var primary = monitors.FirstOrDefault(m => (m.dwFlags & 1) != 0); // MONITORINFOF_PRIMARY
         if (primary.cbSize == 0) primary = monitors[0];
 
@@ -78,7 +78,7 @@ internal static class DisplayProfile
         s.Width  = Math.Max(120, Math.Min(s.Width,  maxW - MARGIN * 2));
         s.Height = Math.Max(32,  Math.Min(s.Height, maxH - MARGIN * 2));
 
-        // Clamp top-left so the whole fence stays inside the work area.
+        // Clamp top-left so the whole picket stays inside the work area.
         double minX = work.left + MARGIN;
         double minY = work.top + MARGIN;
         double maxX = work.right  - s.Width  - MARGIN;

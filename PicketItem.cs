@@ -11,7 +11,7 @@ public enum ItemKind
     Label,  // inline section header -- no path, no icon, just user text
 }
 
-public class FenceItem : INotifyPropertyChanged
+public class PicketItem : INotifyPropertyChanged
 {
     public string Path { get; init; } = "";
     public string DisplayName { get; init; } = "";
@@ -22,7 +22,7 @@ public class FenceItem : INotifyPropertyChanged
     /// <summary>
     /// The icon's position on the real desktop before we hid it. Null if we never
     /// captured it (e.g. the file came from somewhere other than the desktop).
-    /// Used to put the icon back in place when the user removes it from the fence.
+    /// Used to put the icon back in place when the user removes it from the picket.
     /// </summary>
     public POINT? OriginalDesktopPos { get; set; }
 
@@ -90,7 +90,7 @@ public class FenceItem : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-    public static FenceItem FromPath(string path)
+    public static PicketItem FromPath(string path)
     {
         var name = System.IO.Path.GetFileName(path);
         if (string.IsNullOrEmpty(name)) name = path;
@@ -100,7 +100,7 @@ public class FenceItem : INotifyPropertyChanged
             ? System.IO.Path.GetFileNameWithoutExtension(path)
             : name;
 
-        return new FenceItem
+        return new PicketItem
         {
             Path = path,
             DisplayName = display,
@@ -110,9 +110,9 @@ public class FenceItem : INotifyPropertyChanged
         };
     }
 
-    public static FenceItem CreateLabel(string text)
+    public static PicketItem CreateLabel(string text)
     {
-        return new FenceItem
+        return new PicketItem
         {
             Kind = ItemKind.Label,
             DisplayName = text,

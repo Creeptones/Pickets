@@ -6,7 +6,7 @@ namespace Pickets;
 
 /// <summary>
 /// Shift+right-click-drag on the bare desktop to sweep out a rectangle and create a
-/// new fence around enclosed icons. Shift is required in v1 so plain right-click still
+/// new picket around enclosed icons. Shift is required in v1 so plain right-click still
 /// yields Windows' desktop context menu -- we only hijack the RMB gesture once the user
 /// opts in via the Shift modifier.
 ///

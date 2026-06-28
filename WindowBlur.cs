@@ -81,7 +81,7 @@ public static class WindowBlur
 
         // On some Win10/Win11 builds, AcrylicBlurBehind silently adds WS_EX_TRANSPARENT, which
         // makes the whole window click-through -- mouse and OLE drops pass straight through to
-        // whatever is behind us (the desktop). Clear it so the fence stays interactive.
+        // whatever is behind us (the desktop). Clear it so the picket stays interactive.
         long exFinal = exAfter;
         bool clearedTransparent = false;
         if ((exAfter & WS_EX_TRANSPARENT) != 0)

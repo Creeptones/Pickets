@@ -9,7 +9,7 @@ namespace Pickets;
 
 public partial class App : Application
 {
-    private readonly List<FenceWindow> _fences = new();
+    private readonly List<PicketWindow> _pickets = new();
     private DispatcherTimer? _saveDebounce;
     private bool _stateDirty;
     private GlobalHotKey? _quickHide;
@@ -37,7 +37,7 @@ public partial class App : Application
     // desktop whenever Explorer commits a layout change (e.g. the user drags any other icon).
     private DispatcherTimer? _rehideTimer;
 
-    public IReadOnlyList<FenceWindow> Fences => _fences;
+    public IReadOnlyList<PicketWindow> Pickets => _pickets;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -45,7 +45,7 @@ public partial class App : Application
 
         // Single-instance guard FIRST -- before any desktop manipulation. A second launch must not
         // re-hide icons or re-fire the WorkerW spawn (which previously dragged the live desktop
-        // icons off-screen). Instead it pings the running instance to surface its fences, then quits.
+        // icons off-screen). Instead it pings the running instance to surface its pickets, then quits.
         _singleInstance = new SingleInstance();
         if (!_singleInstance.IsFirstInstance)
         {
@@ -84,9 +84,9 @@ public partial class App : Application
         Logger.Log($"Active display profile: {_activeProfile}");
         LoadActiveProfile();
 
-        // Always keep at least one fence around so the user has a UI surface to act from.
-        if (_fences.Count == 0)
-            CreateFence(200, 200);
+        // Always keep at least one picket around so the user has a UI surface to act from.
+        if (_pickets.Count == 0)
+            CreatePicket(200, 200);
 
         _saveDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _saveDebounce.Tick += (_, _) =>
@@ -106,16 +106,16 @@ public partial class App : Application
 
         InstallDisplayChangeWatcher();
 
-        // Ctrl+Alt+D hides/shows every fence -- the "I need a clean desktop right now" panic button.
+        // Ctrl+Alt+D hides/shows every picket -- the "I need a clean desktop right now" panic button.
         _quickHide = new GlobalHotKey(
             WindowInterop.MOD_CONTROL | WindowInterop.MOD_ALT,
             WindowInterop.VK_D,
-            ToggleAllFencesVisibility);
+            ToggleAllPicketsVisibility);
 
-        // Iconic Fences gesture: double-click on the bare desktop toggles fence visibility.
-        _desktopHook = new DesktopDoubleClickHook(ToggleAllFencesVisibility);
+        // Desktop double-click gesture: double-click on the bare desktop toggles picket visibility.
+        _desktopHook = new DesktopDoubleClickHook(ToggleAllPicketsVisibility);
 
-        // Shift+right-click-drag on the desktop to lasso icons into a new fence.
+        // Shift+right-click-drag on the desktop to lasso icons into a new picket.
         _lassoOverlay = new LassoOverlay();
         _lassoHook = new DesktopLassoHook();
         _lassoHook.DragStarted += pt => Dispatcher.BeginInvoke(() =>
@@ -125,30 +125,30 @@ public partial class App : Application
         _lassoHook.DragEnded += rect => Dispatcher.BeginInvoke(() =>
         {
             _lassoOverlay.Hide();
-            CreateFenceFromLasso(rect);
+            CreatePicketFromLasso(rect);
         });
         _lassoHook.DragCancelled += () => Dispatcher.BeginInvoke(() => _lassoOverlay.Hide());
 
-        // Tray icon: the always-reachable control surface. The fences can all be hidden at once, so
+        // Tray icon: the always-reachable control surface. The pickets can all be hidden at once, so
         // without this there's no way to prove the app is running or to quit it.
         _tray = new TrayIcon(
-            onToggleVisibility: ToggleAllFencesVisibility,
-            onNewFence:         () => CreateFence(300, 200),
+            onToggleVisibility: ToggleAllPicketsVisibility,
+            onNewPicket:         () => CreatePicket(300, 200),
             onRestoreAndQuit:   RestoreAllAndQuit,
             onQuit:             Shutdown,
             getRunAtLogin:      () => StartupEntry.IsEnabled,
             setRunAtLogin:      enabled => { if (enabled) StartupEntry.Enable(); else StartupEntry.Disable(); });
 
-        // A later launch (or our own SignalExistingInstance) asks us to surface the fences. The
+        // A later launch (or our own SignalExistingInstance) asks us to surface the pickets. The
         // callback arrives on a thread-pool thread, so hop to the UI thread before touching windows.
-        _singleInstance.ListenForShowRequests(() => Dispatcher.BeginInvoke(SurfaceAllFences));
+        _singleInstance.ListenForShowRequests(() => Dispatcher.BeginInvoke(SurfaceAllPickets));
 
-        // Re-attach fences to the new WorkerW whenever Explorer restarts, so they never get orphaned.
+        // Re-attach pickets to the new WorkerW whenever Explorer restarts, so they never get orphaned.
         _explorerRestartDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(750) };
         _explorerRestartDebounce.Tick += (_, _) =>
         {
             _explorerRestartDebounce!.Stop();
-            ReattachFencesToDesktop();
+            ReattachPicketsToDesktop();
         };
         _explorerWatcher = new ExplorerRestartWatcher();
         _explorerWatcher.Restarted += () => Dispatcher.BeginInvoke(() =>
@@ -158,43 +158,43 @@ public partial class App : Application
         });
     }
 
-    /// <summary>Makes every fence visible and brings them forward -- the response to a second launch
+    /// <summary>Makes every picket visible and brings them forward -- the response to a second launch
     /// attempt, so re-running the app feels like "focus the existing one" rather than a silent no-op.</summary>
-    private void SurfaceAllFences()
+    private void SurfaceAllPickets()
     {
-        foreach (var f in _fences)
+        foreach (var f in _pickets)
         {
             f.Show();
             f.Activate();
         }
         _tray?.ShowBalloon("Pickets is already running",
-            "Your fences are on the desktop. Use the tray icon to hide them or quit.");
+            "Your pickets are on the desktop. Use the tray icon to hide them or quit.");
     }
 
-    /// <summary>After an Explorer restart the old WorkerW is gone, so the fences are orphaned and
+    /// <summary>After an Explorer restart the old WorkerW is gone, so the pickets are orphaned and
     /// invisible. Snapshot, tear down, and respawn them: each new window re-parents to the freshly
-    /// spawned WorkerW (via FenceWindow.OnSourceInitialized) and re-hides its captured icons.</summary>
-    private void ReattachFencesToDesktop()
+    /// spawned WorkerW (via PicketWindow.OnSourceInitialized) and re-hides its captured icons.</summary>
+    private void ReattachPicketsToDesktop()
     {
-        Logger.Log("Explorer restarted -- respawning fences onto the new WorkerW.");
-        var states = _fences.Select(f => f.ToState()).ToList();
-        foreach (var f in _fences.ToList())
+        Logger.Log("Explorer restarted -- respawning pickets onto the new WorkerW.");
+        var states = _pickets.Select(f => f.ToState()).ToList();
+        foreach (var f in _pickets.ToList())
             f.Close();
-        _fences.Clear();
+        _pickets.Clear();
 
         foreach (var state in states)
-            SpawnFence(state);
+            SpawnPicket(state);
 
-        if (_fences.Count == 0)
-            CreateFence(200, 200);
+        if (_pickets.Count == 0)
+            CreatePicket(200, 200);
     }
 
     /// <summary>Re-hides any captured desktop icons Explorer has clamped back on-screen. Skips portal
-    /// fences (their items live in a real folder, not on the desktop) and items we never captured a
+    /// pickets (their items live in a real folder, not on the desktop) and items we never captured a
     /// desktop position for (e.g. files dragged in from a folder rather than off the desktop).</summary>
     private void RehideDriftedIcons()
     {
-        var paths = _fences
+        var paths = _pickets
             .Where(f => !f.IsPortal)
             .SelectMany(f => f.Items)
             .Where(i => i.Kind == ItemKind.File && i.OriginalDesktopPos.HasValue && !i.IsMissing)
@@ -232,21 +232,21 @@ public partial class App : Application
         };
     }
 
-    /// <summary>Instantiates fence windows for the currently-active display profile, clamping
+    /// <summary>Instantiates picket windows for the currently-active display profile, clamping
     /// every saved position into the visible work area first so nothing spawns off-screen.</summary>
     private void LoadActiveProfile()
     {
-        var profileFences = LayoutStore.GetOrSeedProfile(_layout, _activeProfile);
-        foreach (var state in profileFences)
+        var profilePickets = LayoutStore.GetOrSeedProfile(_layout, _activeProfile);
+        foreach (var state in profilePickets)
         {
             DisplayProfile.ClampToVisibleWorkArea(state);
-            SpawnFence(state);
+            SpawnPicket(state);
         }
     }
 
     private void InstallDisplayChangeWatcher()
     {
-        // Message-only window to receive WM_DISPLAYCHANGE regardless of which fence has focus.
+        // Message-only window to receive WM_DISPLAYCHANGE regardless of which picket has focus.
         var p = new HwndSourceParameters("PicketsDisplayWatcher")
         {
             ParentWindow = new IntPtr(-3), // HWND_MESSAGE
@@ -285,9 +285,9 @@ public partial class App : Application
 
         if (newKey == _activeProfile)
         {
-            // Same monitors, but a fence might have landed off the new work area (Parsec can
+            // Same monitors, but a picket might have landed off the new work area (Parsec can
             // shift the work-area origin without changing resolution strings). Re-clamp in place.
-            foreach (var f in _fences)
+            foreach (var f in _pickets)
             {
                 var state = f.ToState();
                 DisplayProfile.ClampToVisibleWorkArea(state);
@@ -300,38 +300,38 @@ public partial class App : Application
 
         Logger.Log($"Display profile changed: '{_activeProfile}' -> '{newKey}'");
 
-        // Snapshot current fences into the outgoing profile and keep as the seed for new profiles.
-        var outgoing = _fences.Select(f => f.ToState()).ToList();
+        // Snapshot current pickets into the outgoing profile and keep as the seed for new profiles.
+        var outgoing = _pickets.Select(f => f.ToState()).ToList();
         _layout.Profiles[_activeProfile] = outgoing;
         _layout.LastProfileSeed = outgoing;
 
-        // Close current fence windows -- positions in the new monitor space differ entirely.
-        foreach (var f in _fences.ToList())
+        // Close current picket windows -- positions in the new monitor space differ entirely.
+        foreach (var f in _pickets.ToList())
             f.Close();
-        _fences.Clear();
+        _pickets.Clear();
 
         _activeProfile = newKey;
         LoadActiveProfile();
 
-        if (_fences.Count == 0)
-            CreateFence(200, 200);
+        if (_pickets.Count == 0)
+            CreatePicket(200, 200);
 
         SaveLayout();
     }
 
-    /// <summary>Spawns a fence sized to the lasso rect, capturing any desktop icons inside it.</summary>
-    private void CreateFenceFromLasso(RECT rect)
+    /// <summary>Spawns a picket sized to the lasso rect, capturing any desktop icons inside it.</summary>
+    private void CreatePicketFromLasso(RECT rect)
     {
         const int MIN_DIM = 40;
         int width = Math.Max(MIN_DIM, rect.right - rect.left);
         int height = Math.Max(MIN_DIM, rect.bottom - rect.top);
 
-        // Enumerate on the original rect, not the expanded fence bounds.
+        // Enumerate on the original rect, not the expanded picket bounds.
         var captured = DesktopIconHider.EnumerateItemsInRect(rect);
 
-        var state = new FenceState
+        var state = new PicketState
         {
-            Title = captured.Count > 0 ? "Lassoed" : "New fence",
+            Title = captured.Count > 0 ? "Lassoed" : "New picket",
             X = rect.left,
             Y = rect.top,
             Width = Math.Max(240, width),
@@ -350,14 +350,14 @@ public partial class App : Application
             });
         }
 
-        var fence = SpawnFence(state);
+        var picket = SpawnPicket(state);
         MarkDirty();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         // A secondary instance set up none of the subsystems below and -- crucially -- must NOT
-        // SaveLayout(), or it would persist its empty fence list over the real layout. Just release
+        // SaveLayout(), or it would persist its empty picket list over the real layout. Just release
         // its mutex handle and leave.
         if (_isSecondaryInstance)
         {
@@ -385,12 +385,12 @@ public partial class App : Application
         base.OnExit(e);
     }
 
-    /// <summary>If any fence is visible, hides them all; otherwise shows them all.</summary>
-    public void ToggleAllFencesVisibility()
+    /// <summary>If any picket is visible, hides them all; otherwise shows them all.</summary>
+    public void ToggleAllPicketsVisibility()
     {
-        if (_fences.Count == 0) return;
-        var anyVisible = _fences.Any(f => f.IsVisible);
-        foreach (var f in _fences)
+        if (_pickets.Count == 0) return;
+        var anyVisible = _pickets.Any(f => f.IsVisible);
+        foreach (var f in _pickets)
         {
             if (anyVisible) f.Hide();
             else            f.Show();
@@ -400,57 +400,57 @@ public partial class App : Application
     private void MarkDirty()
     {
         _stateDirty = true;
-        // Any layout change can flip another fence's "touching neighbors" state, so refresh all.
-        foreach (var f in _fences) f.RefreshLinkState();
+        // Any layout change can flip another picket's "touching neighbors" state, so refresh all.
+        foreach (var f in _pickets) f.RefreshLinkState();
     }
 
-    public int FenceCount => _fences.Count;
+    public int PicketCount => _pickets.Count;
 
-    public FenceWindow CreateFence(double x, double y)
+    public PicketWindow CreatePicket(double x, double y)
     {
-        var state = new FenceState
+        var state = new PicketState
         {
-            Title = "New fence",
+            Title = "New picket",
             X = x, Y = y,
             Width = 320, Height = 240,
         };
-        var fence = SpawnFence(state);
+        var picket = SpawnPicket(state);
         MarkDirty();
-        return fence;
+        return picket;
     }
 
-    public void DeleteFence(FenceWindow fence)
+    public void DeletePicket(PicketWindow picket)
     {
         // Portal items live in a real folder -- they never had a captured desktop position,
         // so the restore loop is both unnecessary and semantically wrong for them.
-        if (!fence.IsPortal)
+        if (!picket.IsPortal)
         {
-            foreach (var item in fence.Items)
+            foreach (var item in picket.Items)
             {
                 if (item.OriginalDesktopPos.HasValue && !item.IsMissing)
                     DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value);
             }
         }
-        _fences.Remove(fence);
-        fence.Close();
+        _pickets.Remove(picket);
+        picket.Close();
         MarkDirty();
     }
 
-    private FenceWindow SpawnFence(FenceState state)
+    private PicketWindow SpawnPicket(PicketState state)
     {
-        var fence = new FenceWindow(state);
-        fence.LayoutChanged += (_, _) => MarkDirty();
-        fence.Show();
-        _fences.Add(fence);
-        // Spawning a new fence may already overlap an existing one -- refresh everyone's link state.
-        foreach (var f in _fences) f.RefreshLinkState();
-        return fence;
+        var picket = new PicketWindow(state);
+        picket.LayoutChanged += (_, _) => MarkDirty();
+        picket.Show();
+        _pickets.Add(picket);
+        // Spawning a new picket may already overlap an existing one -- refresh everyone's link state.
+        foreach (var f in _pickets) f.RefreshLinkState();
+        return picket;
     }
 
     private void SaveLayout()
     {
         // Persist only the active profile -- other profiles in _layout remain untouched.
-        _layout.Profiles[_activeProfile] = _fences.Select(f => f.ToState()).ToList();
+        _layout.Profiles[_activeProfile] = _pickets.Select(f => f.ToState()).ToList();
         _layout.LastProfileSeed = _layout.Profiles[_activeProfile];
         LayoutStore.Save(_layout);
     }
@@ -460,7 +460,7 @@ public partial class App : Application
     {
         var result = MessageBox.Show(
             "Restore all hidden desktop icons and quit Pickets?\n\n" +
-            "Your fence layout will still be saved -- icons will be hidden again next launch.",
+            "Your picket layout will still be saved -- icons will be hidden again next launch.",
             "Pickets", MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (result != MessageBoxResult.OK) return;
 
@@ -468,10 +468,10 @@ public partial class App : Application
         // straight back off-screen.
         _rehideTimer?.Stop();
 
-        foreach (var fence in _fences)
+        foreach (var picket in _pickets)
         {
-            if (fence.IsPortal) continue; // portal items aren't captured from the desktop
-            foreach (var item in fence.Items)
+            if (picket.IsPortal) continue; // portal items aren't captured from the desktop
+            foreach (var item in picket.Items)
             {
                 if (item.OriginalDesktopPos.HasValue)
                     DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value);

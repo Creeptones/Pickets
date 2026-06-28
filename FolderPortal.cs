@@ -99,7 +99,7 @@ public sealed class FolderPortal : IDisposable
         _uiDispatcher.BeginInvoke(() =>
         {
             // If the new name is hidden (e.g. renamed with a leading dot, or attribute set
-            // separately), treat it as a removal so the stale entry disappears from the fence.
+            // separately), treat it as a removal so the stale entry disappears from the picket.
             if (IsHidden(e.FullPath))
             {
                 ItemRemoved?.Invoke(e.OldFullPath);

@@ -1,79 +1,63 @@
 # Pickets
 
-A lightweight desktop-icon organizer for Windows 11. Sort your desktop shortcuts into movable,
-resizable, translucent **fences** that float on the wallpaper behind your icons — keeping the
-desktop tidy without a heavyweight shell extension.
+A lightweight desktop icon organizer for Windows 11. Drop your desktop shortcuts into tidy,
+movable, see-through boxes called pickets that sit on the wallpaper behind your icons.
 
-> **Not affiliated with, or endorsed by, Stardock Corporation.** *Fences* is a trademark of
-> Stardock Corporation. Pickets is an independent, open-source project.
+Not affiliated with Stardock. "Fences" is a trademark of Stardock Corporation. Pickets is an
+independent, open source project.
 
 ## Features
 
-- **Fences** — translucent containers you can drag, resize, roll up, recolor (18 palettes),
-  and set per-fence transparency or acrylic blur on.
-- **Capture desktop icons** — drag a file/shortcut onto a fence (or **Shift + right-drag** a lasso
-  on the desktop) to move its icon into the fence; the real desktop icon is hidden, not deleted.
-- **Folder portals** — point a fence at a folder and it live-mirrors that folder's contents.
-- **Section labels**, **large (2×2) icons**, inline rename.
-- **Snap & link** — fences magnetically snap to screen edges and to each other; snapped clusters
-  move together.
-- **Per-display profiles** — separate layouts per monitor arrangement (handy for docking/remote).
-- **System tray icon** — show/hide all fences, create a fence, toggle run-at-login, or quit.
-- **Single-instance** with crash/Explorer-restart resilience.
-- **Runs entirely offline.** No network access, no telemetry, no accounts.
+- Group desktop icons into movable, resizable pickets.
+- Drag any file or shortcut onto a picket to tuck its icon away.
+- Shift + right-drag a box on the desktop to lasso icons into a new picket.
+- 18 color themes, adjustable transparency, and optional blur.
+- Point a picket at a folder to mirror its contents live.
+- Add section labels and switch icons to a large 2x2 size.
+- Pickets snap to screen edges and to each other, and snapped groups move together.
+- Separate layouts for each monitor setup.
+- System tray icon to show or hide pickets, add a picket, or quit.
+- Single instance, with crash and Explorer restart recovery.
+- Runs fully offline. No network, no telemetry, no accounts.
 
 ## Requirements
 
-- Windows 10 (1809+) or Windows 11
-- [.NET 9 SDK](https://dotnet.microsoft.com/download) to build from source
-- Desktop **must** have *Auto arrange icons* and *Align icons to grid* turned **off**
-  (right-click desktop → View). Pickets warns you on launch if either is on — it can only hide
-  icons cleanly when both are off.
+- Windows 10 (1809 or newer) or Windows 11.
+- .NET 9 SDK to build from source.
+- Turn off "Auto arrange icons" and "Align icons to grid" (right click desktop, then View).
+  Pickets warns you if either is on.
 
-## Build & run
+## Build and run
 
 ```powershell
 dotnet build -c Release
 dotnet run -c Release
 ```
 
-To produce a self-contained executable (no .NET install needed to run it):
+Self contained build (no .NET install needed to run it):
 
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
-The build is unsigned, so Windows SmartScreen may show an "Unknown publisher" prompt the first
-time you run a downloaded binary — choose **More info → Run anyway**.
+The build is unsigned, so SmartScreen may warn on first run. Pick More info, then Run anyway.
 
-## Usage
+## Basic use
 
-- **Add icons:** drag files/shortcuts onto a fence, or **Shift + right-drag** a box on the desktop.
-- **Move/resize:** drag the title bar; drag the right/bottom/corner edges to resize.
-- **Hide/show all fences:** `Ctrl + Alt + D`, double-click the bare desktop, or use the tray icon.
-- **Restore icons:** right-click a fence title → *Restore all icons and quit*, or remove individual
-  items (*Remove from fence*) to send their icons back to the desktop.
-- **Quit:** tray icon → *Quit*, or a fence title → *Quit*.
+- Add icons: drag files onto a picket, or Shift + right-drag a box on the desktop.
+- Move or resize: drag the title bar or the edges.
+- Hide or show all pickets: Ctrl + Alt + D, double click the desktop, or use the tray icon.
+- Restore icons: remove an item from a picket, or use the tray to restore all and quit.
 
-Layout is saved to `%APPDATA%\Pickets\layout.json`.
+Your layout is saved to %APPDATA%\Pickets\layout.json.
 
-## How it works (and a heads-up for antivirus)
+## Notes
 
-Pickets parents its fence windows to Explorer's `WorkerW` layer (the space between the wallpaper and
-the desktop icons) and hides captured icons by repositioning them off-screen via `IFolderView`.
-It installs a global low-level **mouse hook** purely to detect the lasso gesture and the
-double-click-desktop shortcut — it does **not** log keystrokes or send anything anywhere; everything
-is local. Some antivirus heuristics flag low-level hooks generically; the full source is here so you
-can verify exactly what it does.
-
-## Known limitations
-
-- Moving a desktop icon makes Windows briefly clamp hidden icons back on-screen; a 1-second watchdog
-  re-hides them, so you may see a short flicker.
-- The off-screen hiding technique requires *Auto arrange* / *Align to grid* to stay off.
-- Folder-portal sync does not yet recover from a `FileSystemWatcher` buffer overflow (very rapid bulk
-  changes); restart the app or toggle the portal to resync.
+- The global mouse hook is only used to detect the lasso and double click gestures. It does not
+  log keystrokes or send anything anywhere. The full source is here to verify.
+- Moving a desktop icon can make hidden icons flash back for about a second before a watchdog
+  re-hides them.
 
 ## License
 
-[MIT](LICENSE) © 2026 Creeptone
+MIT. See [LICENSE](LICENSE).

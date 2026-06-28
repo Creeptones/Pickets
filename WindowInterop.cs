@@ -129,7 +129,7 @@ internal static class WindowInterop
 
 /// <summary>
 /// Registers a single global hotkey on a hidden message-only window so it works
-/// regardless of which fence (if any) currently has focus.
+/// regardless of which picket (if any) currently has focus.
 /// </summary>
 public sealed class GlobalHotKey : IDisposable
 {

@@ -14,12 +14,12 @@ using System.Windows.Media;
 
 namespace Pickets;
 
-public partial class FenceWindow : Window
+public partial class PicketWindow : Window
 {
-    public string FenceId { get; }
-    public ObservableCollection<FenceItem> Items { get; } = new();
+    public string PicketId { get; }
+    public ObservableCollection<PicketItem> Items { get; } = new();
 
-    /// <summary>Raised whenever the fence's persistent state changes (move, resize, item add/remove).</summary>
+    /// <summary>Raised whenever the picket's persistent state changes (move, resize, item add/remove).</summary>
     public event EventHandler? LayoutChanged;
 
     // When set, Items mirrors a live folder. Manual drag-drop is disabled; desktop-icon
@@ -36,9 +36,9 @@ public partial class FenceWindow : Window
     private int _transparencyCustomPercent = 50;
     private bool _blurEnabled;
 
-    // Group-drag: when the user grabs this fence's title, every fence whose edges currently touch
+    // Group-drag: when the user grabs this picket's title, every picket whose edges currently touch
     // ours (transitively) tags along, so a snapped row/column moves as one.
-    private List<FenceWindow>? _dragCluster;
+    private List<PicketWindow>? _dragCluster;
     private double _dragLastLeft, _dragLastTop;
 
     // Snap unstick: capture screen rect at drag-start so TrySnap can disable per-axis snapping
@@ -60,10 +60,10 @@ public partial class FenceWindow : Window
         _ => 100,
     };
 
-    public FenceWindow(FenceState state)
+    public PicketWindow(PicketState state)
     {
         InitializeComponent();
-        FenceId = state.Id;
+        PicketId = state.Id;
         TitleText.Text = state.Title;
         Left = state.X; Top = state.Y; Width = state.Width; Height = state.Height;
         ItemsHost.ItemsSource = Items;
@@ -78,7 +78,7 @@ public partial class FenceWindow : Window
         _isLoading = true;
         if (!string.IsNullOrEmpty(state.PortalPath))
         {
-            // Portal fence: skip saved items (they're rebuilt from the folder) and start watching.
+            // Portal picket: skip saved items (they're rebuilt from the folder) and start watching.
             StartPortal(state.PortalPath);
         }
         else
@@ -87,10 +87,10 @@ public partial class FenceWindow : Window
             {
                 if (i.Kind == ItemKind.Label)
                 {
-                    Items.Add(FenceItem.CreateLabel(i.LabelText ?? ""));
+                    Items.Add(PicketItem.CreateLabel(i.LabelText ?? ""));
                     continue;
                 }
-                var fi = FenceItem.FromPath(i.Path);
+                var fi = PicketItem.FromPath(i.Path);
                 if (i.HasOriginalPos)
                     fi.OriginalDesktopPos = new POINT(i.OriginalX!.Value, i.OriginalY!.Value);
                 fi.IsLarge = i.IsLarge;
@@ -111,9 +111,9 @@ public partial class FenceWindow : Window
         _suppressSliderEvent = false;
     }
 
-    public FenceState ToState() => new()
+    public PicketState ToState() => new()
     {
-        Id = FenceId,
+        Id = PicketId,
         Title = TitleText.Text,
         X = Left, Y = Top,
         Width = Width,
@@ -124,7 +124,7 @@ public partial class FenceWindow : Window
         TransparencyCustomPercent = _transparencyCustomPercent,
         PortalPath = _portal?.FolderPath,
         BlurEnabled = _blurEnabled,
-        // Portal fences rebuild Items from the folder on each launch -- don't persist them.
+        // Portal pickets rebuild Items from the folder on each launch -- don't persist them.
         Items = IsPortal
             ? new List<ItemState>()
             : Items.Select(i => i.Kind == ItemKind.Label
@@ -206,12 +206,12 @@ public partial class FenceWindow : Window
         if (Math.Abs(r.top - work.top) <= SNAP_PIXELS)          TryY(work.top);
         if (Math.Abs(r.bottom - work.bottom) <= SNAP_PIXELS)    TryY(work.bottom - height);
 
-        // Other fences -- but only if they're actually near us on the perpendicular axis. Without
-        // this guard a fence in the top-left can magnetize a fence in the bottom-right just because
+        // Other pickets -- but only if they're actually near us on the perpendicular axis. Without
+        // this guard a picket in the top-left can magnetize a picket in the bottom-right just because
         // their left edges share an X coordinate, which is the source of "phantom" stickiness.
         if (Application.Current is App app)
         {
-            foreach (var other in app.Fences)
+            foreach (var other in app.Pickets)
             {
                 var oh = new WindowInteropHelper(other).Handle;
                 if (oh == selfHwnd || oh == IntPtr.Zero) continue;
@@ -243,7 +243,7 @@ public partial class FenceWindow : Window
         return snapped;
     }
 
-    /// <summary>When any fence in a touching cluster gets activated, raise every cluster member to
+    /// <summary>When any picket in a touching cluster gets activated, raise every cluster member to
     /// the top so the whole magnetized group surfaces together. Followers are raised with
     /// SWP_NOACTIVATE so they don't fire their own Activated and infinite-loop.</summary>
     protected override void OnActivated(EventArgs e)
@@ -330,15 +330,15 @@ public partial class FenceWindow : Window
         WindowInterop.GetWindowRect(new WindowInteropHelper(this).Handle, out _dragStartScreenRect);
     }
 
-    private List<FenceWindow> ComputeTouchingCluster()
+    private List<PicketWindow> ComputeTouchingCluster()
     {
         const double TOL = 4.0;  // snap leaves edges flush, but allow a few px for float drift
 
-        var cluster = new List<FenceWindow> { this };
+        var cluster = new List<PicketWindow> { this };
         if (Application.Current is not App app) return cluster;
-        var pool = app.Fences.ToList();
+        var pool = app.Pickets.ToList();
 
-        var queue = new Queue<FenceWindow>();
+        var queue = new Queue<PicketWindow>();
         queue.Enqueue(this);
         while (queue.Count > 0)
         {
@@ -356,7 +356,7 @@ public partial class FenceWindow : Window
         return cluster;
     }
 
-    private static bool Touches(FenceWindow a, FenceWindow b, double tol)
+    private static bool Touches(PicketWindow a, PicketWindow b, double tol)
     {
         double aL = a.Left, aR = a.Left + a.Width, aT = a.Top, aB = a.Top + a.Height;
         double bL = b.Left, bR = b.Left + b.Width, bT = b.Top, bB = b.Top + b.Height;
@@ -375,18 +375,18 @@ public partial class FenceWindow : Window
 
     private void TitleMenu_ToggleCollapse_Click(object sender, RoutedEventArgs e) => ToggleCollapse();
 
-    private void TitleMenu_NewFence_Click(object sender, RoutedEventArgs e)
+    private void TitleMenu_NewPicket_Click(object sender, RoutedEventArgs e)
     {
         if (Application.Current is App app)
-            app.CreateFence(Left + 30, Top + 30);
+            app.CreatePicket(Left + 30, Top + 30);
     }
 
-    private void AddFenceBtn_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void AddPicketBtn_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         // Mark handled so the title bar's drag-move doesn't pick this click up.
         e.Handled = true;
         if (Application.Current is App app)
-            app.CreateFence(Left + 30, Top + 30);
+            app.CreatePicket(Left + 30, Top + 30);
     }
 
     private void UnlinkBtn_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -395,7 +395,7 @@ public partial class FenceWindow : Window
         var neighbors = ComputeTouchingCluster().Where(f => f != this).ToList();
         if (neighbors.Count == 0) return;
 
-        // Push this fence in the direction away from the cluster's centroid -- that breaks contact
+        // Push this picket in the direction away from the cluster's centroid -- that breaks contact
         // regardless of whether neighbors are above, below, or surrounding us.
         double cx = neighbors.Average(f => f.Left + f.Width  / 2);
         double cy = neighbors.Average(f => f.Top  + f.Height / 2);
@@ -409,8 +409,8 @@ public partial class FenceWindow : Window
         Top  += dy / mag * SHIFT;
     }
 
-    /// <summary>Updates the unlink button's visibility based on whether this fence touches any neighbor.
-    /// Called by App after any fence in the system moves.</summary>
+    /// <summary>Updates the unlink button's visibility based on whether this picket touches any neighbor.
+    /// Called by App after any picket in the system moves.</summary>
     public void RefreshLinkState()
     {
         if (UnlinkBtn == null) return;  // pre-XAML-init guard
@@ -420,7 +420,7 @@ public partial class FenceWindow : Window
     private bool HasTouchingNeighbor()
     {
         if (Application.Current is not App app) return false;
-        foreach (var other in app.Fences)
+        foreach (var other in app.Pickets)
         {
             if (other == this) continue;
             if (Touches(this, other, 4.0)) return true;
@@ -428,21 +428,21 @@ public partial class FenceWindow : Window
         return false;
     }
 
-    private void TitleMenu_DeleteFence_Click(object sender, RoutedEventArgs e)
+    private void TitleMenu_DeletePicket_Click(object sender, RoutedEventArgs e)
     {
-        if (Application.Current is App app && app.FenceCount <= 1)
+        if (Application.Current is App app && app.PicketCount <= 1)
         {
-            MessageBox.Show("Can't delete the last fence -- create another one first.",
+            MessageBox.Show("Can't delete the last picket -- create another one first.",
                 "Pickets", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         var msg = IsPortal
             ? "Delete this folder portal? The underlying folder is not affected."
-            : "Delete this fence? Captured icons will be restored to the desktop.";
+            : "Delete this picket? Captured icons will be restored to the desktop.";
         var result = MessageBox.Show(msg, "Pickets",
             MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (result != MessageBoxResult.OK) return;
-        if (Application.Current is App app2) app2.DeleteFence(this);
+        if (Application.Current is App app2) app2.DeletePicket(this);
     }
 
     private void TitleMenu_CleanMissing_Click(object sender, RoutedEventArgs e)
@@ -459,14 +459,14 @@ public partial class FenceWindow : Window
     private void TitleMenu_Quit_Click(object sender, RoutedEventArgs e)
     {
         // Plain quit: layout auto-saves via the debounce timer and OnExit, and hidden desktop
-        // icons stay hidden (they'll reappear in their fences on next launch). No confirmation --
+        // icons stay hidden (they'll reappear in their pickets on next launch). No confirmation --
         // this is a reversible action since relaunching restores everything.
         if (Application.Current is App app) app.Shutdown();
     }
 
     private void TitleMenu_HideAll_Click(object sender, RoutedEventArgs e)
     {
-        if (Application.Current is App app) app.ToggleAllFencesVisibility();
+        if (Application.Current is App app) app.ToggleAllPicketsVisibility();
     }
 
     private void TitleMenu_SetColor_Click(object sender, RoutedEventArgs e)
@@ -548,14 +548,14 @@ public partial class FenceWindow : Window
     private void ApplyVisuals()
     {
         if (OuterShell == null) return; // can fire from XAML-parse-time slider events before fields are wired
-        var scheme = FenceColors.Get(_colorKey);
+        var scheme = PicketColors.Get(_colorKey);
         var factor = CurrentTransparencyPercent / 100.0;
 
         // When blur is on, the system acrylic provides the background color via its gradient tint,
         // so we intentionally paint the shell nearly transparent -- otherwise a second opaque layer
         // sits on top of the blur and defeats it. We use alpha=1 (not 0) because this window is
         // layered (AllowsTransparency=True): fully transparent pixels are click-through at the OS
-        // level, so Explorer drops would fall past the fence onto the desktop behind it.
+        // level, so Explorer drops would fall past the picket onto the desktop behind it.
         Color bgColor = _blurEnabled ? Color.FromArgb(1, 0, 0, 0) : ScaleAlpha(scheme.Background, factor);
         var bg     = new SolidColorBrush(bgColor);
         var titleB = new SolidColorBrush(ScaleAlpha(scheme.TitleBackground, factor));
@@ -569,9 +569,9 @@ public partial class FenceWindow : Window
         TitleText.Foreground = fg;
         TitleEditBox.Foreground = fg;
         TitleEditBox.CaretBrush = fg;
-        Resources["FenceItemForeground"] = fg;
+        Resources["PicketItemForeground"] = fg;
         // Label halo is a Color (not a Brush) because DropShadowEffect.Color takes a Color DP.
-        Resources["FenceItemShadowColor"] = scheme.Shadow;
+        Resources["PicketItemShadowColor"] = scheme.Shadow;
 
         ApplyBlur();
     }
@@ -580,7 +580,7 @@ public partial class FenceWindow : Window
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == IntPtr.Zero) return; // hasn't been realized yet; OnSourceInitialized will call us
-        var scheme = FenceColors.Get(_colorKey);
+        var scheme = PicketColors.Get(_colorKey);
         var factor = CurrentTransparencyPercent / 100.0;
         // Tint alpha is scaled down further so the blur is visibly doing work rather than being
         // masked by a near-opaque tint.
@@ -621,7 +621,7 @@ public partial class FenceWindow : Window
         TitleText.Visibility = Visibility.Visible;
         // Leaving keyboard focus on the now-hidden TextBox breaks OLE drop routing on this
         // WorkerW-parented child window: subsequent Explorer drags fall through to the
-        // desktop behind the fence instead of hitting the ScrollViewer drop target.
+        // desktop behind the picket instead of hitting the ScrollViewer drop target.
         Keyboard.ClearFocus();
     }
 
@@ -677,7 +677,7 @@ public partial class FenceWindow : Window
         if (newH >= MinHeight) Height = newH;
     }
 
-    // === Drag-drop into the fence body ===
+    // === Drag-drop into the picket body ===
     private bool _loggedFirstDragOver;
     private void ItemsHost_DragOver(object sender, DragEventArgs e)
     {
@@ -696,7 +696,7 @@ public partial class FenceWindow : Window
         if (IsPortal)
         {
             // Portals mirror their folder on disk. Dropping moves (or copies with Ctrl) the
-            // dragged items into that folder; the watcher surfaces them as fence items.
+            // dragged items into that folder; the watcher surfaces them as picket items.
             bool copy = (e.KeyStates & DragDropKeyStates.ControlKey) == DragDropKeyStates.ControlKey;
             e.Effects = copy ? DragDropEffects.Copy : DragDropEffects.Move;
         }
@@ -741,7 +741,7 @@ public partial class FenceWindow : Window
             if (Items.Any(it => string.Equals(it.Path, p, StringComparison.OrdinalIgnoreCase)))
                 continue;
 
-            var item = FenceItem.FromPath(p);
+            var item = PicketItem.FromPath(p);
             item.OriginalDesktopPos = DesktopIconHider.Hide(p);
             item.IsMissing = !PathExists(p);
             Items.Add(item);
@@ -820,7 +820,7 @@ public partial class FenceWindow : Window
     // === Item interactions ===
     private void Item_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not FrameworkElement fe || fe.DataContext is not FenceItem item) return;
+        if (sender is not FrameworkElement fe || fe.DataContext is not PicketItem item) return;
 
         if (e.ClickCount == 2)
         {
@@ -843,14 +843,14 @@ public partial class FenceWindow : Window
         e.Handled = true;
     }
 
-    private void ClearSelection(FenceItem? except = null)
+    private void ClearSelection(PicketItem? except = null)
     {
         foreach (var i in Items)
             if (i.IsSelected && !ReferenceEquals(i, except))
                 i.IsSelected = false;
     }
 
-    // Click on empty fence body (below the last item) clears the current selection, matching
+    // Click on empty picket body (below the last item) clears the current selection, matching
     // Explorer's behavior.
     private void BodyScroll_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -860,13 +860,13 @@ public partial class FenceWindow : Window
     private void Item_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         if (sender is FrameworkElement fe && fe.ContextMenu is ContextMenu cm
-            && fe.DataContext is FenceItem item)
+            && fe.DataContext is PicketItem item)
         {
             var largeItem = cm.Items.OfType<MenuItem>()
                 .FirstOrDefault(mi => "LargeToggle".Equals(mi.Tag));
             if (largeItem != null) largeItem.IsChecked = item.IsLarge;
 
-            // Labels don't belong inside portal fences (they're derived from the folder), so
+            // Labels don't belong inside portal pickets (they're derived from the folder), so
             // hide "Insert label above..." on portal items.
             var insertLabel = cm.Items.OfType<MenuItem>()
                 .FirstOrDefault(mi => mi.Header is string s && s.StartsWith("Insert label"));
@@ -877,13 +877,13 @@ public partial class FenceWindow : Window
 
     private void ItemMenu_Open_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is MenuItem mi && mi.DataContext is FenceItem item)
+        if (sender is MenuItem mi && mi.DataContext is PicketItem item)
             LaunchItem(item);
     }
 
     private void ItemMenu_OpenLocation_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is MenuItem mi && mi.DataContext is FenceItem item)
+        if (sender is MenuItem mi && mi.DataContext is PicketItem item)
         {
             try
             {
@@ -899,7 +899,7 @@ public partial class FenceWindow : Window
 
     private void ItemMenu_ToggleLarge_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is MenuItem mi && mi.DataContext is FenceItem item)
+        if (sender is MenuItem mi && mi.DataContext is PicketItem item)
         {
             item.IsLarge = !item.IsLarge;
             RaiseLayoutChanged();
@@ -908,7 +908,7 @@ public partial class FenceWindow : Window
 
     private void ItemMenu_Remove_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is MenuItem mi && mi.DataContext is FenceItem item)
+        if (sender is MenuItem mi && mi.DataContext is PicketItem item)
         {
             if (item.OriginalDesktopPos.HasValue && !item.IsMissing)
                 DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value);
@@ -916,7 +916,7 @@ public partial class FenceWindow : Window
         }
     }
 
-    private void LaunchItem(FenceItem item)
+    private void LaunchItem(PicketItem item)
     {
         if (item.IsMissing)
         {
@@ -942,19 +942,19 @@ public partial class FenceWindow : Window
 
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = "Pick a folder to mirror in this fence",
+            Title = "Pick a folder to mirror in this picket",
         };
         if (dialog.ShowDialog(this) != true) return;
 
         var folderPath = dialog.FolderName;
         if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath)) return;
 
-        // Warn before wiping a non-empty fence so an accidental convert doesn't quietly
+        // Warn before wiping a non-empty picket so an accidental convert doesn't quietly
         // discard manually curated items. Captured desktop icons are restored either way.
         if (Items.Count > 0)
         {
             var result = MessageBox.Show(
-                "Converting this fence to a folder portal will remove its current items. " +
+                "Converting this picket to a folder portal will remove its current items. " +
                 "Any captured desktop icons will be restored to the desktop.\n\nContinue?",
                 "Pickets", MessageBoxButton.OKCancel, MessageBoxImage.Question);
             if (result != MessageBoxResult.OK) return;
@@ -1021,7 +1021,7 @@ public partial class FenceWindow : Window
     {
         if (Items.Any(i => string.Equals(i.Path, path, StringComparison.OrdinalIgnoreCase)))
             return; // dedupe: initial scan + Created events can race on the same path
-        var item = FenceItem.FromPath(path);
+        var item = PicketItem.FromPath(path);
         Items.Insert(FindPortalInsertIndex(item), item);
     }
 
@@ -1040,7 +1040,7 @@ public partial class FenceWindow : Window
 
     /// <summary>Returns the index at which `item` should be inserted to maintain
     /// folders-first, case-insensitive alphabetical ordering.</summary>
-    private int FindPortalInsertIndex(FenceItem item)
+    private int FindPortalInsertIndex(PicketItem item)
     {
         for (int i = 0; i < Items.Count; i++)
         {
@@ -1092,23 +1092,23 @@ public partial class FenceWindow : Window
         }
         var text = InputDialog.Show(this, "Section label", "Label text:", "Section");
         if (string.IsNullOrWhiteSpace(text)) return;
-        Items.Add(FenceItem.CreateLabel(text.Trim()));
+        Items.Add(PicketItem.CreateLabel(text.Trim()));
     }
 
     private void ItemMenu_InsertLabelAbove_Click(object sender, RoutedEventArgs e)
     {
         if (IsPortal) return;
-        if (sender is not MenuItem mi || mi.DataContext is not FenceItem clicked) return;
+        if (sender is not MenuItem mi || mi.DataContext is not PicketItem clicked) return;
         var text = InputDialog.Show(this, "Section label", "Label text:", "Section");
         if (string.IsNullOrWhiteSpace(text)) return;
         var idx = Items.IndexOf(clicked);
         if (idx < 0) idx = Items.Count;
-        Items.Insert(idx, FenceItem.CreateLabel(text.Trim()));
+        Items.Insert(idx, PicketItem.CreateLabel(text.Trim()));
     }
 
     private void LabelMenu_Rename_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem mi || mi.DataContext is not FenceItem label) return;
+        if (sender is not MenuItem mi || mi.DataContext is not PicketItem label) return;
         if (label.Kind != ItemKind.Label) return;
         var text = InputDialog.Show(this, "Rename label", "Label text:", label.LabelText);
         if (string.IsNullOrWhiteSpace(text)) return;
@@ -1118,7 +1118,7 @@ public partial class FenceWindow : Window
 
     private void LabelMenu_Remove_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem mi || mi.DataContext is not FenceItem label) return;
+        if (sender is not MenuItem mi || mi.DataContext is not PicketItem label) return;
         if (label.Kind != ItemKind.Label) return;
         Items.Remove(label);
     }
@@ -1143,7 +1143,7 @@ public partial class FenceWindow : Window
     {
         if (StartupEntry.IsEnabled) StartupEntry.Disable();
         else                        StartupEntry.Enable();
-        // No need to mark layout dirty -- the registry entry is system state, not fence state.
+        // No need to mark layout dirty -- the registry entry is system state, not picket state.
     }
 
     private static void RefreshLaunchAtLoginCheck(ContextMenu cm)

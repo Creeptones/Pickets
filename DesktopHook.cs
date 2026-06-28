@@ -10,7 +10,7 @@ namespace Pickets;
 /// Caveat: WindowFromPoint can't tell us whether the user double-clicked a desktop *icon* or empty
 /// space (icons aren't separate hwnds -- they live inside SysListView32). Cross-process hit-testing
 /// would require remote LVHITTESTINFO marshalling, which is overkill for this. So a double-click on
-/// an icon will both launch the icon AND toggle the fences -- noisy but harmless. Users who want
+/// an icon will both launch the icon AND toggle the pickets -- noisy but harmless. Users who want
 /// precision can use the Ctrl+Alt+D hotkey instead.
 /// </summary>
 public sealed class DesktopDoubleClickHook : IDisposable

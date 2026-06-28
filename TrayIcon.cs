@@ -5,7 +5,7 @@ using System.Windows.Forms;
 namespace Pickets;
 
 /// <summary>
-/// System-tray presence for Pickets. The fences live at the desktop (WorkerW) layer and can
+/// System-tray presence for Pickets. The pickets live at the desktop (WorkerW) layer and can
 /// all be hidden at once, leaving the app with no visible surface -- the tray icon is the always-
 /// reachable control point: it proves an instance is running and lets the user quit it.
 ///
@@ -19,7 +19,7 @@ public sealed class TrayIcon : IDisposable
 
     public TrayIcon(
         Action onToggleVisibility,
-        Action onNewFence,
+        Action onNewPicket,
         Action onRestoreAndQuit,
         Action onQuit,
         Func<bool> getRunAtLogin,
@@ -27,8 +27,8 @@ public sealed class TrayIcon : IDisposable
     {
         var menu = new ContextMenuStrip();
 
-        menu.Items.Add(new ToolStripMenuItem("Show / hide fences", null, (_, _) => onToggleVisibility()));
-        menu.Items.Add(new ToolStripMenuItem("New fence", null, (_, _) => onNewFence()));
+        menu.Items.Add(new ToolStripMenuItem("Show / hide pickets", null, (_, _) => onToggleVisibility()));
+        menu.Items.Add(new ToolStripMenuItem("New picket", null, (_, _) => onNewPicket()));
         menu.Items.Add(new ToolStripSeparator());
 
         // "&&" renders as a literal ampersand (a single "&" would become a mnemonic underline).
@@ -41,7 +41,7 @@ public sealed class TrayIcon : IDisposable
         menu.Items.Add(new ToolStripMenuItem("Quit Pickets", null, (_, _) => onQuit()));
 
         // Sync the checkmark to actual registry state every time the menu opens, so a change made
-        // from a fence's title menu (or another tool) is always reflected.
+        // from a picket's title menu (or another tool) is always reflected.
         menu.Opening += (_, _) => runAtLogin.Checked = getRunAtLogin();
 
         _icon = new NotifyIcon
@@ -52,7 +52,7 @@ public sealed class TrayIcon : IDisposable
             ContextMenuStrip = menu,
         };
 
-        // Left-click is the quick "show/hide my fences" toggle; right-click opens the menu (handled
+        // Left-click is the quick "show/hide my pickets" toggle; right-click opens the menu (handled
         // automatically by NotifyIcon via ContextMenuStrip).
         _icon.MouseClick += (_, e) =>
         {

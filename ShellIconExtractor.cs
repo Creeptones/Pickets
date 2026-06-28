@@ -83,7 +83,7 @@ public static class ShellIconExtractor
         // with black instead of being transparent -- opaque black at the core, anti-aliased
         // dark pixels at the edges. If all four corners read as that filler (RGB=0, any alpha),
         // strip black: treat every pixel whose RGB is 0 as transparent regardless of alpha, so
-        // anti-aliased halos don't leave a dark ring on light fences.
+        // anti-aliased halos don't leave a dark ring on light pickets.
         int tr = (w - 1) * 4;
         int bl = (h - 1) * stride;
         int br = bl + tr;
