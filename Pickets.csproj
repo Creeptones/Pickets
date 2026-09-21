@@ -1,13 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <!-- WinForms is enabled solely for System.Windows.Forms.NotifyIcon (the tray icon). It ships
          with the Windows Desktop runtime, so this adds no external dependency. -->
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <RootNamespace>Pickets</RootNamespace>
@@ -17,7 +20,7 @@
     <Product>Pickets</Product>
     <Authors>Creeptone</Authors>
     <Company>Creeptone</Company>
-    <Description>Lightweight desktop-icon organizer for Windows 11 — sort desktop shortcuts into movable, translucent "fences". Not affiliated with Stardock.</Description>
+    <Description>Lightweight desktop-icon organizer for Windows 10 and 11 — sort desktop shortcuts into movable, translucent pickets.</Description>
     <Copyright>Copyright (c) 2026 Creeptone</Copyright>
     <Version>1.0.0</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>

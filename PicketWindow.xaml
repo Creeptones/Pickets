@@ -26,67 +26,37 @@
         <ContextMenu x:Key="TitleContextMenu">
             <MenuItem Header="Rename picket..." Click="TitleMenu_Rename_Click"/>
             <MenuItem Header="Roll up / down" Click="TitleMenu_ToggleCollapse_Click"/>
-            <MenuItem Header="Color" Tag="ColorMenu">
-                <MenuItem Header="White" Tag="white" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#FFFFFF" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
+            <MenuItem Header="Appearance">
+                <MenuItem Header="Color" Tag="ColorMenu">
+                <MenuItem Header="Porcelain" Tag="porcelain" IsCheckable="True" Click="TitleMenu_SetColor_Click">
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#A79F94" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#E5DFD5" Offset="0.5"/><GradientStop Color="#F5F2EC" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="Stone" Tag="stone" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#EDEDED" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
-                </MenuItem>
-                <MenuItem Header="Cloud" Tag="cloud" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#F2F4F7" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
-                </MenuItem>
-                <MenuItem Header="Sand" Tag="sand" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#F0EBDF" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
+                <MenuItem Header="Sandstone" Tag="sandstone" IsCheckable="True" Click="TitleMenu_SetColor_Click">
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#A08055" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#DDC8A8" Offset="0.5"/><GradientStop Color="#F3EADC" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="Sage" Tag="sage" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#E2EAE0" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#7B9680" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#C5D5C6" Offset="0.5"/><GradientStop Color="#E7EEE7" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="Sky" Tag="sky" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#E0E8F0" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
+                <MenuItem Header="Ocean" Tag="ocean" IsCheckable="True" Click="TitleMenu_SetColor_Click">
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#6E91A4" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#B9D1DE" Offset="0.5"/><GradientStop Color="#E5EFF4" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="Blush" Tag="blush" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#F0E2E2" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
-                </MenuItem>
-                <MenuItem Header="Lilac" Tag="lilac" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#E5E0EC" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
-                </MenuItem>
-                <MenuItem Header="Mint" Tag="mint" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#DEEAE3" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
-                </MenuItem>
-                <MenuItem Header="Peach" Tag="peach" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#F5E1CE" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
-                </MenuItem>
-                <MenuItem Header="Apricot" Tag="apricot" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#F5D2B0" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
-                </MenuItem>
-                <MenuItem Header="Butter" Tag="butter" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#F5EECE" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
-                </MenuItem>
-                <MenuItem Header="Coral" Tag="coral" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#F5D6CE" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
+                <MenuItem Header="Lavender" Tag="lavender" IsCheckable="True" Click="TitleMenu_SetColor_Click">
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#8E7BA5" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#D3C8E0" Offset="0.5"/><GradientStop Color="#EFEBF5" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="Rose" Tag="rose" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#F2CED8" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
-                </MenuItem>
-                <MenuItem Header="Teal" Tag="teal" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#D4E6E4" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
-                </MenuItem>
-                <MenuItem Header="Periwinkle" Tag="periwinkle" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#DCDEF0" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#A67B84" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#DFC4C8" Offset="0.5"/><GradientStop Color="#F4E8E9" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
                 <Separator/>
-                <MenuItem Header="Slate" Tag="slate" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#2B3540" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
+                <MenuItem Header="Midnight" Tag="midnight" IsCheckable="True" Click="TitleMenu_SetColor_Click">
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#496B91" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#1D3555" Offset="0.5"/><GradientStop Color="#131B29" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="Charcoal" Tag="charcoal" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#2E2E2E" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
+                <MenuItem Header="Graphite" Tag="graphite" IsCheckable="True" Click="TitleMenu_SetColor_Click">
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#58616E" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#292E36" Offset="0.5"/><GradientStop Color="#181B20" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
-                <MenuItem Header="Black" Tag="black" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Fill="#000000" Stroke="#888" StrokeThickness="1"/></MenuItem.Icon>
+                <Separator/>
+                <MenuItem Header="Apply current theme to all Pickets" Click="TitleMenu_ApplyColorToAll_Click"/>
                 </MenuItem>
-            </MenuItem>
-            <MenuItem Header="Transparency" Tag="TransparencyMenu">
+                <MenuItem Header="Transparency" Tag="TransparencyMenu">
                 <MenuItem Header="Solid (100%)" Tag="solid"  IsCheckable="True" Click="TitleMenu_SetTransparency_Click"/>
                 <MenuItem Header="Light (65%)"  Tag="light"  IsCheckable="True" Click="TitleMenu_SetTransparency_Click"/>
                 <MenuItem Header="Medium (40%)" Tag="medium" IsCheckable="True" Click="TitleMenu_SetTransparency_Click"/>
@@ -103,22 +73,22 @@
                         </StackPanel>
                     </MenuItem.Header>
                 </MenuItem>
+                </MenuItem>
+                <MenuItem Header="Blur background" Tag="BlurToggle" IsCheckable="True" Click="TitleMenu_ToggleBlur_Click"/>
             </MenuItem>
-            <MenuItem Header="Blur background (Win10+)" Tag="BlurToggle" IsCheckable="True" Click="TitleMenu_ToggleBlur_Click"/>
             <Separator/>
             <MenuItem Header="Add section label..." Click="TitleMenu_AddLabel_Click"/>
-            <Separator/>
-            <MenuItem Header="Convert to folder portal..." Tag="ConvertToPortal" Click="TitleMenu_ConvertToPortal_Click"/>
-            <MenuItem Header="Open folder in Explorer" Tag="OpenPortalFolder" Click="TitleMenu_OpenPortalFolder_Click"/>
-            <MenuItem Header="Disconnect portal" Tag="DisconnectPortal" Click="TitleMenu_DisconnectPortal_Click"/>
-            <Separator/>
             <MenuItem Header="New picket here" Click="TitleMenu_NewPicket_Click"/>
             <MenuItem Header="Delete this picket" Click="TitleMenu_DeletePicket_Click"/>
-            <MenuItem Header="Clean up missing items" Click="TitleMenu_CleanMissing_Click"/>
+            <MenuItem Header="Settings">
+                <MenuItem Header="Clean up missing items" Click="TitleMenu_CleanMissing_Click"/>
+                <Separator/>
+                <MenuItem Header="Hide / show all pickets (Ctrl+Alt+D)" Click="TitleMenu_HideAll_Click"/>
+                <MenuItem Header="Launch at login" Tag="LaunchAtLogin" IsCheckable="True" Click="TitleMenu_ToggleLaunchAtLogin_Click"/>
+                <Separator/>
+                <MenuItem Header="Restore all icons and quit" Click="TitleMenu_RestoreAll_Click"/>
+            </MenuItem>
             <Separator/>
-            <MenuItem Header="Hide / show all pickets (Ctrl+Alt+D or double-click desktop)" Click="TitleMenu_HideAll_Click"/>
-            <MenuItem Header="Launch at login" Tag="LaunchAtLogin" IsCheckable="True" Click="TitleMenu_ToggleLaunchAtLogin_Click"/>
-            <MenuItem Header="Restore all icons and quit" Click="TitleMenu_RestoreAll_Click"/>
             <MenuItem Header="Quit Pickets" Click="TitleMenu_Quit_Click"/>
         </ContextMenu>
 
@@ -157,7 +127,7 @@
                 <Border x:Name="TitleShell"
                         DockPanel.Dock="Top"
                         Background="#D0DDDDDD"
-                        Height="26"
+                        Height="30"
                         CornerRadius="10,10,0,0"
                         MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
                         ContextMenu="{StaticResource TitleContextMenu}"
@@ -175,15 +145,20 @@
                                    Margin="12,0,4,0"
                                    FontWeight="SemiBold"
                                    FontSize="14"
-                                   TextTrimming="CharacterEllipsis"/>
+                                   TextTrimming="CharacterEllipsis">
+                            <TextBlock.Effect>
+                                <DropShadowEffect ShadowDepth="0" BlurRadius="3" Opacity="1"
+                                                  Color="{DynamicResource PicketTitleShadowColor}"/>
+                            </TextBlock.Effect>
+                        </TextBlock>
                         <TextBox x:Name="TitleEditBox"
                                  Grid.Column="0"
                                  Visibility="Collapsed"
                                  VerticalAlignment="Center"
                                  Margin="10,1,4,1"
-                                 Background="#80FFFFFF"
+                                 Background="{DynamicResource PicketEditorBackground}"
                                  Foreground="#2C2C2C"
-                                 BorderBrush="#80999999"
+                                 BorderBrush="{DynamicResource PicketEditorBorder}"
                                  FontSize="14"
                                  KeyDown="TitleEditBox_KeyDown"
                                  LostFocus="TitleEditBox_LostFocus"/>
@@ -205,17 +180,22 @@
                                     <Style TargetType="Border">
                                         <Style.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#26000000"/>
+                                                <Setter Property="Background" Value="{DynamicResource PicketControlHoverBrush}"/>
                                             </Trigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
                                 <TextBlock Text="&#xE71B;"
                                            FontFamily="Segoe MDL2 Assets"
-                                           Foreground="{DynamicResource PicketItemForeground}"
+                                           Foreground="{DynamicResource PicketTitleForeground}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
-                                           FontSize="12"/>
+                                           FontSize="12">
+                                    <TextBlock.Effect>
+                                        <DropShadowEffect ShadowDepth="0" BlurRadius="3" Opacity="1"
+                                                          Color="{DynamicResource PicketTitleShadowColor}"/>
+                                    </TextBlock.Effect>
+                                </TextBlock>
                             </Border>
                             <Border x:Name="AddPicketBtn"
                                     Width="22" Height="22"
@@ -229,18 +209,23 @@
                                     <Style TargetType="Border">
                                         <Style.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#26000000"/>
+                                                <Setter Property="Background" Value="{DynamicResource PicketControlHoverBrush}"/>
                                             </Trigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
                                 <TextBlock Text="+"
-                                           Foreground="{DynamicResource PicketItemForeground}"
+                                           Foreground="{DynamicResource PicketTitleForeground}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
                                            FontSize="16"
                                            FontWeight="Bold"
-                                           Margin="0,-2,0,0"/>
+                                           Margin="0,-2,0,0">
+                                    <TextBlock.Effect>
+                                        <DropShadowEffect ShadowDepth="0" BlurRadius="3" Opacity="1"
+                                                          Color="{DynamicResource PicketTitleShadowColor}"/>
+                                    </TextBlock.Effect>
+                                </TextBlock>
                             </Border>
                         </StackPanel>
                     </Grid>
@@ -264,12 +249,14 @@
                                         Cursor="Hand"
                                         Opacity="{Binding CellOpacity}"
                                         MouseLeftButtonDown="Item_MouseDown"
+                                        MouseMove="Item_MouseMove"
+                                        MouseLeftButtonUp="Item_MouseLeftButtonUp"
                                         ContextMenu="{StaticResource ItemContextMenu}"
                                         ContextMenuOpening="Item_ContextMenuOpening"
                                         ToolTip="{Binding Path}">
                                     <Border.Style>
-                                        <!-- Base: fully transparent. Hover adds a faint darken that reads on
-                                             both light and dark picket schemes. Selection uses a translucent
+                                        <!-- Base: fully transparent. Hover follows the theme's contrast color,
+                                             so it lightens dark schemes and darkens light schemes. Selection uses a translucent
                                              accent fill + matching border so the wallpaper/picket color still
                                              shows through the highlight. -->
                                         <Style TargetType="Border">
@@ -277,11 +264,11 @@
                                             <Setter Property="BorderBrush" Value="Transparent"/>
                                             <Style.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="#1A000000"/>
+                                                    <Setter Property="Background" Value="{DynamicResource PicketItemHoverBrush}"/>
                                                 </Trigger>
                                                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                    <Setter Property="Background" Value="#402B6AD9"/>
-                                                    <Setter Property="BorderBrush" Value="#A02B6AD9"/>
+                                                    <Setter Property="Background" Value="{DynamicResource PicketSelectionBackground}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource PicketSelectionBorder}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -314,7 +301,7 @@
                                 <Border Width="{Binding ActualWidth, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=WrapPanel}}"
                                         Margin="0,8,0,4"
                                         Padding="6,2"
-                                        Background="#20000000"
+                                        Background="{DynamicResource PicketSectionBackground}"
                                         CornerRadius="3"
                                         Cursor="Hand"
                                         ContextMenu="{StaticResource LabelContextMenu}">

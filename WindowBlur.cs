@@ -86,7 +86,7 @@ public static class WindowBlur
         bool clearedTransparent = false;
         if ((exAfter & WS_EX_TRANSPARENT) != 0)
         {
-            SetWindowLongPtr(hwnd, GWL_EXSTYLE, (IntPtr)(exAfter & ~WS_EX_TRANSPARENT));
+            SetWindowLongPtr(hwnd, GWL_EXSTYLE, new IntPtr(exAfter & ~WS_EX_TRANSPARENT));
             exFinal = (long)GetWindowLongPtr(hwnd, GWL_EXSTYLE);
             clearedTransparent = true;
         }

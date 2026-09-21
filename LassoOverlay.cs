@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -62,10 +63,12 @@ public sealed class LassoOverlay : IDisposable
         {
             var hwnd = new WindowInteropHelper(_window).Handle;
             var ex = WindowInterop.GetWindowLong(hwnd, WindowInterop.GWL_EXSTYLE);
-            WindowInterop.SetWindowLong(hwnd, WindowInterop.GWL_EXSTYLE,
+            var previousStyle = WindowInterop.SetWindowLong(hwnd, WindowInterop.GWL_EXSTYLE,
                 ex | WindowInterop.WS_EX_TRANSPARENT
                    | WindowInterop.WS_EX_TOOLWINDOW
                    | WindowInterop.WS_EX_NOACTIVATE);
+            if (previousStyle == 0 && Marshal.GetLastWin32Error() != 0)
+                Logger.Log($"Could not apply lasso overlay window style: {Marshal.GetLastWin32Error()}");
         };
     }
 

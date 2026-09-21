@@ -20,7 +20,13 @@ internal static class StartupEntry
             try
             {
                 using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: false);
-                return key?.GetValue(ValueName) is string s && !string.IsNullOrWhiteSpace(s);
+                if (key?.GetValue(ValueName) is not string value || string.IsNullOrWhiteSpace(value))
+                    return false;
+
+                var configuredPath = value.Trim().Trim('"');
+                return !string.IsNullOrEmpty(Environment.ProcessPath) &&
+                       string.Equals(configuredPath, Environment.ProcessPath,
+                           StringComparison.OrdinalIgnoreCase);
             }
             catch (Exception ex)
             {

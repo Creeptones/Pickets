@@ -36,13 +36,16 @@ public static class Logger
         catch { }
     }
 
-    public static void Reset()
+    /// <summary>Starts a fresh log while retaining the immediately previous session. This keeps
+    /// crash evidence available after the user relaunches the app to report a problem.</summary>
+    public static void StartSession()
     {
         try
         {
             lock (Gate)
             {
-                if (File.Exists(LogPath)) File.Delete(LogPath);
+                if (!File.Exists(LogPath)) return;
+                File.Move(LogPath, LogPath + ".previous", overwrite: true);
             }
         }
         catch { }

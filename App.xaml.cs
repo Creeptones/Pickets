@@ -7,6 +7,8 @@ using System.Windows.Threading;
 
 namespace Pickets;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
+    Justification = "WPF owns the Application lifetime; all native and managed resources are released in OnExit.")]
 public partial class App : Application
 {
     private readonly List<PicketWindow> _pickets = new();
@@ -55,7 +57,7 @@ public partial class App : Application
             return;
         }
 
-        Logger.Reset();
+        Logger.StartSession();
         Logger.Log("=== App startup ===");
 
         // Carry the user's layout + run-at-login across the DesktopFences -> Pickets rename. No-op
@@ -189,13 +191,11 @@ public partial class App : Application
             CreatePicket(200, 200);
     }
 
-    /// <summary>Re-hides any captured desktop icons Explorer has clamped back on-screen. Skips portal
-    /// pickets (their items live in a real folder, not on the desktop) and items we never captured a
-    /// desktop position for (e.g. files dragged in from a folder rather than off the desktop).</summary>
+    /// <summary>Re-hides any captured desktop icons Explorer has clamped back on-screen. Items we
+    /// never captured from the desktop have no saved position and are ignored.</summary>
     private void RehideDriftedIcons()
     {
         var paths = _pickets
-            .Where(f => !f.IsPortal)
             .SelectMany(f => f.Items)
             .Where(i => i.Kind == ItemKind.File && i.OriginalDesktopPos.HasValue && !i.IsMissing)
             .Select(i => i.Path)
@@ -336,6 +336,7 @@ public partial class App : Application
             Y = rect.top,
             Width = Math.Max(240, width),
             Height = Math.Max(180, height),
+            ColorKey = PicketColors.Get(_layout.DefaultColorKey).Key,
         };
 
         foreach (var (path, _) in captured)
@@ -404,6 +405,27 @@ public partial class App : Application
         foreach (var f in _pickets) f.RefreshLinkState();
     }
 
+    /// <summary>Applies a theme to every saved profile, every active Picket, and future Pickets.
+    /// Choosing a theme normally remains scoped to the Picket whose menu was used.</summary>
+    public void ApplyColorThemeToAll(string key)
+    {
+        var canonicalKey = PicketColors.Get(key).Key;
+        _layout.DefaultColorKey = canonicalKey;
+
+        foreach (var profile in _layout.Profiles.Values)
+            foreach (var state in profile)
+                state.ColorKey = canonicalKey;
+        if (_layout.LastProfileSeed != null)
+            foreach (var state in _layout.LastProfileSeed)
+                state.ColorKey = canonicalKey;
+        foreach (var appearance in _layout.Appearances.Values)
+            appearance.ColorKey = canonicalKey;
+
+        foreach (var picket in _pickets)
+            picket.ApplyColorTheme(canonicalKey);
+        MarkDirty();
+    }
+
     public int PicketCount => _pickets.Count;
 
     public PicketWindow CreatePicket(double x, double y)
@@ -413,6 +435,7 @@ public partial class App : Application
             Title = "New picket",
             X = x, Y = y,
             Width = 320, Height = 240,
+            ColorKey = PicketColors.Get(_layout.DefaultColorKey).Key,
         };
         var picket = SpawnPicket(state);
         MarkDirty();
@@ -421,15 +444,10 @@ public partial class App : Application
 
     public void DeletePicket(PicketWindow picket)
     {
-        // Portal items live in a real folder -- they never had a captured desktop position,
-        // so the restore loop is both unnecessary and semantically wrong for them.
-        if (!picket.IsPortal)
+        foreach (var item in picket.Items)
         {
-            foreach (var item in picket.Items)
-            {
-                if (item.OriginalDesktopPos.HasValue && !item.IsMissing)
-                    DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value);
-            }
+            if (item.OriginalDesktopPos.HasValue && !item.IsMissing)
+                DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value);
         }
         _pickets.Remove(picket);
         picket.Close();
@@ -502,7 +520,6 @@ public partial class App : Application
 
         foreach (var picket in _pickets)
         {
-            if (picket.IsPortal) continue; // portal items aren't captured from the desktop
             foreach (var item in picket.Items)
             {
                 if (item.OriginalDesktopPos.HasValue)

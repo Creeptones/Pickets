@@ -58,6 +58,8 @@ internal static class ShellApi
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1838:Avoid StringBuilder parameters for P/Invokes",
+        Justification = "SHGetPathFromIDListW writes to a fixed MAX_PATH buffer and this signature is the established safe marshaling pattern.")]
     public static extern bool SHGetPathFromIDList(IntPtr pidl, [Out] System.Text.StringBuilder pszPath);
 }
 

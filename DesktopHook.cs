@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace Pickets;
 
@@ -72,9 +71,10 @@ public sealed class DesktopDoubleClickHook : IDisposable
     {
         var hwnd = WindowInterop.WindowFromPoint(pt);
         if (hwnd == IntPtr.Zero) return false;
-        var sb = new StringBuilder(64);
-        WindowInterop.GetClassName(hwnd, sb, sb.Capacity);
-        var cls = sb.ToString();
+        var buffer = new char[64];
+        var length = WindowInterop.GetClassName(hwnd, buffer, buffer.Length);
+        if (length <= 0) return false;
+        var cls = new string(buffer, 0, length);
         // Class hierarchy on Win10/11 desktop: Progman -> SHELLDLL_DefView -> SysListView32
         // (or WorkerW when wallpaper engines/slideshow are active).
         return cls is "SysListView32" or "SHELLDLL_DefView" or "Progman" or "WorkerW";

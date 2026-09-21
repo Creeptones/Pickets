@@ -26,12 +26,15 @@ public class LayoutFile
     /// keyed by picket Title. Positions stay per-display, but a picket looks the same everywhere.
     /// Absent in older files; seeded from the first profile loaded after the upgrade.</summary>
     public Dictionary<string, PicketAppearance> Appearances { get; set; } = new();
+
+    /// <summary>Theme inherited by newly created Pickets. Updated by the app-wide color action.</summary>
+    public string DefaultColorKey { get; set; } = "porcelain";
 }
 
 /// <summary>A picket's visual style, kept global (shared by every display profile).</summary>
 public class PicketAppearance
 {
-    public string ColorKey { get; set; } = "stone";
+    public string ColorKey { get; set; } = "porcelain";
     public string TransparencyKey { get; set; } = "solid";
     public int TransparencyCustomPercent { get; set; } = 50;
     public bool BlurEnabled { get; set; }
@@ -46,12 +49,12 @@ public class PicketState
     public double Width { get; set; } = 420;
     public double Height { get; set; } = 320;
     public bool IsCollapsed { get; set; }
-    public string ColorKey { get; set; } = "stone";
+    public string ColorKey { get; set; } = "porcelain";
     public string TransparencyKey { get; set; } = "solid";
     public int TransparencyCustomPercent { get; set; } = 50;
 
-    /// <summary>When set, this picket mirrors the named folder instead of holding manual items.
-    /// Items are rebuilt from the folder on each launch -- we persist only the folder path.</summary>
+    /// <summary>Legacy migration field. Current builds convert an old portal into a normal folder
+    /// item on load and omit this value on the next save.</summary>
     public string? PortalPath { get; set; }
 
     public bool BlurEnabled { get; set; }
@@ -92,22 +95,97 @@ public static class LayoutStore
         }
     }
 
+    public static string BackupPath => LayoutPath + ".bak";
+
     public static LayoutFile Load()
     {
+        var primary = TryLoad(LayoutPath, out var primaryError);
+        if (primary != null)
+            return primary;
+
+        if (primaryError != null)
+            Logger.Log($"Could not read primary layout '{LayoutPath}': {primaryError}");
+
+        var backup = TryLoad(BackupPath, out var backupError);
+        if (backup != null)
+        {
+            Logger.Log($"Recovered layout from backup '{BackupPath}'.");
+            return backup;
+        }
+
+        if (backupError != null)
+            Logger.Log($"Could not read backup layout '{BackupPath}': {backupError}");
+
+        return DefaultLayout();
+    }
+
+    private static LayoutFile? TryLoad(string path, out string? error)
+    {
+        error = null;
+        if (!File.Exists(path)) return null;
+
         try
         {
-            if (!File.Exists(LayoutPath)) return DefaultLayout();
-            var json = File.ReadAllText(LayoutPath);
-            return ParseWithMigration(json) ?? DefaultLayout();
+            var layout = ParseWithMigration(File.ReadAllText(path));
+            if (layout == null)
+                error = "The file is not a recognized Pickets layout.";
+            else
+                Normalize(layout);
+            return layout;
         }
         catch (Exception ex)
         {
-            // Returning the default here means the user silently loses their layout. Log first so
-            // we at least know why the next launch looks empty (bad JSON, permission denied, etc.).
-            Logger.Log($"LayoutStore.Load failed: {ex}");
-            return DefaultLayout();
+            error = ex.ToString();
+            return null;
         }
     }
+
+    private static void Normalize(LayoutFile layout)
+    {
+        layout.Profiles ??= new Dictionary<string, List<PicketState>>();
+        layout.Appearances ??= new Dictionary<string, PicketAppearance>();
+        layout.DefaultColorKey = PicketColors.Get(layout.DefaultColorKey).Key;
+
+        foreach (var key in layout.Profiles.Keys.ToList())
+            layout.Profiles[key] = NormalizeStates(layout.Profiles[key]);
+
+        foreach (var key in layout.Appearances.Keys.ToList())
+        {
+            var appearance = layout.Appearances[key];
+            if (appearance == null)
+            {
+                layout.Appearances.Remove(key);
+                continue;
+            }
+            appearance.ColorKey = PicketColors.Get(appearance.ColorKey).Key;
+            appearance.TransparencyKey = NormalizeTransparency(appearance.TransparencyKey);
+            appearance.TransparencyCustomPercent = Math.Clamp(appearance.TransparencyCustomPercent, 0, 100);
+        }
+
+        if (layout.LastProfileSeed != null)
+            layout.LastProfileSeed = NormalizeStates(layout.LastProfileSeed);
+    }
+
+    private static List<PicketState> NormalizeStates(List<PicketState>? states)
+    {
+        states ??= new List<PicketState>();
+        states.RemoveAll(state => state == null);
+        foreach (var state in states)
+        {
+            if (string.IsNullOrWhiteSpace(state.Id)) state.Id = Guid.NewGuid().ToString();
+            if (string.IsNullOrWhiteSpace(state.Title)) state.Title = "Picket";
+            state.ColorKey = PicketColors.Get(state.ColorKey).Key;
+            state.TransparencyKey = NormalizeTransparency(state.TransparencyKey);
+            state.TransparencyCustomPercent = Math.Clamp(state.TransparencyCustomPercent, 0, 100);
+            state.Items ??= new List<ItemState>();
+            state.Items.RemoveAll(item => item == null ||
+                (item.Kind == ItemKind.File && string.IsNullOrWhiteSpace(item.Path)));
+        }
+        return states;
+    }
+
+    private static string NormalizeTransparency(string? key)
+        => key is "solid" or "light" or "medium" or "heavy" or "custom" ? key : "solid";
 
     /// <summary>V1 had a flat top-level "Fences" array; V2 keys every picket list under a
     /// display-profile string. Detect the version and migrate in memory so the user's existing
@@ -189,16 +267,42 @@ public static class LayoutStore
 
     public static void Save(LayoutFile layout)
     {
+        string? temporaryPath = null;
         try
         {
             var json = JsonSerializer.Serialize(layout, Options);
-            File.WriteAllText(LayoutPath, json);
+            var path = LayoutPath;
+            temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+
+            // Never write over the only good copy. Flush a complete temporary file first, then
+            // atomically replace the primary while retaining the previous version as a backup.
+            using (var stream = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write,
+                       FileShare.None, 4096, FileOptions.WriteThrough))
+            using (var writer = new StreamWriter(stream))
+            {
+                writer.Write(json);
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
+            }
+
+            if (File.Exists(path))
+                File.Replace(temporaryPath, path, BackupPath, ignoreMetadataErrors: true);
+            else
+                File.Move(temporaryPath, path);
+
+            temporaryPath = null;
         }
         catch (Exception ex)
         {
-            // Persistence failures shouldn't crash the app, but silent swallows have masked bugs
-            // before (disk full, antivirus holding the handle, AppData redirected). Log and move on.
             Logger.Log($"LayoutStore.Save failed: {ex}");
+        }
+        finally
+        {
+            if (temporaryPath != null)
+            {
+                try { File.Delete(temporaryPath); }
+                catch { }
+            }
         }
     }
 

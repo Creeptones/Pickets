@@ -6,55 +6,103 @@ namespace Pickets;
 public record PicketColorScheme(
     string Key,
     string DisplayName,
-    Color SwatchSolid,    // shown in the menu icon (no alpha)
-    Color Background,     // outer body fill (with alpha)
-    Color TitleBackground,// title bar fill (with alpha)
-    Color Border,         // outer border (with alpha)
-    Color Foreground,     // text + caret (opaque)
-    Color Shadow);        // soft halo behind item labels for legibility on any wallpaper
+    Color Background,
+    Color TitleBackground,
+    Color Border,
+    Color Accent)
+{
+    public Color TitleForeground => PicketColors.ContrastForeground(TitleBackground);
+    public Color ItemForeground => PicketColors.ContrastForeground(Background);
+    public Color TitleShadow => PicketColors.HaloFor(TitleForeground);
+    public Color ItemShadow => PicketColors.HaloFor(ItemForeground);
+}
 
 /// <summary>
-/// Light, low-saturation palette plus two dark schemes. Values keep the picket airy on top
-/// of a wallpaper while staying readable thanks to a per-scheme label halo (light schemes
-/// use a white halo so dark text pops over dark wallpapers; dark schemes invert).
+/// A compact set of coordinated surface systems. Each theme owns the canvas, navigation chrome,
+/// outline, and interaction accent; readable foregrounds and wallpaper halos are derived.
 /// </summary>
 public static class PicketColors
 {
-    private static readonly Color Ink       = Color.FromRgb(0x2C, 0x2C, 0x2C);
-    private static readonly Color Paper     = Color.FromRgb(0xED, 0xED, 0xED);
-    // Halo alphas sit around 80% so they read cleanly without drowning the text itself.
+    private static readonly Color Ink       = Color.FromRgb(0x25, 0x27, 0x2B);
+    private static readonly Color Paper     = Color.FromRgb(0xF4, 0xF5, 0xF7);
     private static readonly Color LightHalo = Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF);
     private static readonly Color DarkHalo  = Color.FromArgb(0xCC, 0x00, 0x00, 0x00);
 
     public static readonly IReadOnlyList<PicketColorScheme> All = new[]
     {
-        new PicketColorScheme("white",    "White",    Color.FromRgb(0xFF,0xFF,0xFF), Color.FromRgb(0xFF,0xFF,0xFF), Color.FromRgb(0xF2,0xF2,0xF2), Color.FromRgb(0xB0,0xB0,0xB0), Paper, DarkHalo),
-        new PicketColorScheme("stone",    "Stone",    Color.FromRgb(0xED,0xED,0xED), Color.FromRgb(0xED,0xED,0xED), Color.FromRgb(0xDD,0xDD,0xDD), Color.FromRgb(0x99,0x99,0x99), Paper, DarkHalo),
-        new PicketColorScheme("cloud",    "Cloud",    Color.FromRgb(0xF2,0xF4,0xF7), Color.FromRgb(0xF2,0xF4,0xF7), Color.FromRgb(0xE0,0xE4,0xEA), Color.FromRgb(0x99,0xA0,0xAA), Paper, DarkHalo),
-        new PicketColorScheme("sand",     "Sand",     Color.FromRgb(0xF0,0xEB,0xDF), Color.FromRgb(0xF0,0xEB,0xDF), Color.FromRgb(0xE2,0xDC,0xC8), Color.FromRgb(0xA8,0xA0,0x88), Paper, DarkHalo),
-        new PicketColorScheme("sage",     "Sage",     Color.FromRgb(0xE2,0xEA,0xE0), Color.FromRgb(0xE2,0xEA,0xE0), Color.FromRgb(0xCF,0xD9,0xCD), Color.FromRgb(0x99,0xA8,0x99), Paper, DarkHalo),
-        new PicketColorScheme("sky",      "Sky",      Color.FromRgb(0xE0,0xE8,0xF0), Color.FromRgb(0xE0,0xE8,0xF0), Color.FromRgb(0xCC,0xD7,0xE2), Color.FromRgb(0x99,0xA8,0xB8), Paper, DarkHalo),
-        new PicketColorScheme("blush",    "Blush",    Color.FromRgb(0xF0,0xE2,0xE2), Color.FromRgb(0xF0,0xE2,0xE2), Color.FromRgb(0xE0,0xCE,0xCE), Color.FromRgb(0xB8,0x99,0x99), Paper, DarkHalo),
-        new PicketColorScheme("lilac",    "Lilac",    Color.FromRgb(0xE5,0xE0,0xEC), Color.FromRgb(0xE5,0xE0,0xEC), Color.FromRgb(0xD0,0xC9,0xDA), Color.FromRgb(0xA8,0x99,0xB8), Paper, DarkHalo),
-        new PicketColorScheme("mint",     "Mint",     Color.FromRgb(0xDE,0xEA,0xE3), Color.FromRgb(0xDE,0xEA,0xE3), Color.FromRgb(0xC8,0xD8,0xCD), Color.FromRgb(0x99,0xB0,0xA0), Paper, DarkHalo),
-        new PicketColorScheme("peach",    "Peach",    Color.FromRgb(0xF5,0xE1,0xCE), Color.FromRgb(0xF5,0xE1,0xCE), Color.FromRgb(0xE6,0xCB,0xB1), Color.FromRgb(0xB8,0x99,0x7A), Paper, DarkHalo),
-        new PicketColorScheme("apricot",  "Apricot",  Color.FromRgb(0xF5,0xD2,0xB0), Color.FromRgb(0xF5,0xD2,0xB0), Color.FromRgb(0xE6,0xBD,0x96), Color.FromRgb(0xC8,0x99,0x70), Paper, DarkHalo),
-        new PicketColorScheme("butter",   "Butter",   Color.FromRgb(0xF5,0xEE,0xCE), Color.FromRgb(0xF5,0xEE,0xCE), Color.FromRgb(0xE6,0xDC,0xB1), Color.FromRgb(0xB8,0xAC,0x7A), Paper, DarkHalo),
-        new PicketColorScheme("coral",    "Coral",    Color.FromRgb(0xF5,0xD6,0xCE), Color.FromRgb(0xF5,0xD6,0xCE), Color.FromRgb(0xE6,0xBF,0xB1), Color.FromRgb(0xC8,0x8E,0x7A), Paper, DarkHalo),
-        new PicketColorScheme("rose",     "Rose",     Color.FromRgb(0xF2,0xCE,0xD8), Color.FromRgb(0xF2,0xCE,0xD8), Color.FromRgb(0xE0,0xB1,0xBF), Color.FromRgb(0xB8,0x7A,0x8E), Paper, DarkHalo),
-        new PicketColorScheme("teal",     "Teal",     Color.FromRgb(0xD4,0xE6,0xE4), Color.FromRgb(0xD4,0xE6,0xE4), Color.FromRgb(0xBB,0xD2,0xCF), Color.FromRgb(0x82,0xA5,0xA2), Paper, DarkHalo),
-        new PicketColorScheme("periwinkle","Periwinkle",Color.FromRgb(0xDC,0xDE,0xF0), Color.FromRgb(0xDC,0xDE,0xF0), Color.FromRgb(0xC4,0xC7,0xE0), Color.FromRgb(0x8A,0x8E,0xB8), Paper, DarkHalo),
-        // Dark schemes designed for dark wallpapers. Light text + dark halo stays legible even
-        // when the user cranks transparency way down.
-        new PicketColorScheme("slate",    "Slate",    Color.FromRgb(0x2B,0x35,0x40), Color.FromRgb(0x2B,0x35,0x40), Color.FromRgb(0x22,0x2B,0x35), Color.FromRgb(0x49,0x56,0x6A), Paper, DarkHalo),
-        new PicketColorScheme("charcoal", "Charcoal", Color.FromRgb(0x2E,0x2E,0x2E), Color.FromRgb(0x2E,0x2E,0x2E), Color.FromRgb(0x24,0x24,0x24), Color.FromRgb(0x55,0x55,0x55), Paper, DarkHalo),
-        new PicketColorScheme("black",    "Black",    Color.FromRgb(0x00,0x00,0x00), Color.FromRgb(0x00,0x00,0x00), Color.FromRgb(0x0A,0x0A,0x0A), Color.FromRgb(0x33,0x33,0x33), Paper, DarkHalo),
+        new PicketColorScheme("porcelain", "Porcelain",
+            Color.FromRgb(0xF5,0xF2,0xEC), Color.FromRgb(0xE5,0xDF,0xD5),
+            Color.FromRgb(0xA7,0x9F,0x94), Color.FromRgb(0x6F,0x7F,0x91)),
+        new PicketColorScheme("sandstone", "Sandstone",
+            Color.FromRgb(0xF3,0xEA,0xDC), Color.FromRgb(0xDD,0xC8,0xA8),
+            Color.FromRgb(0xA0,0x80,0x55), Color.FromRgb(0xB8,0x70,0x3D)),
+        new PicketColorScheme("sage", "Sage",
+            Color.FromRgb(0xE7,0xEE,0xE7), Color.FromRgb(0xC5,0xD5,0xC6),
+            Color.FromRgb(0x7B,0x96,0x80), Color.FromRgb(0x4F,0x7D,0x64)),
+        new PicketColorScheme("ocean", "Ocean",
+            Color.FromRgb(0xE5,0xEF,0xF4), Color.FromRgb(0xB9,0xD1,0xDE),
+            Color.FromRgb(0x6E,0x91,0xA4), Color.FromRgb(0x2E,0x75,0x9C)),
+        new PicketColorScheme("lavender", "Lavender",
+            Color.FromRgb(0xEF,0xEB,0xF5), Color.FromRgb(0xD3,0xC8,0xE0),
+            Color.FromRgb(0x8E,0x7B,0xA5), Color.FromRgb(0x75,0x5A,0x99)),
+        new PicketColorScheme("rose", "Rose",
+            Color.FromRgb(0xF4,0xE8,0xE9), Color.FromRgb(0xDF,0xC4,0xC8),
+            Color.FromRgb(0xA6,0x7B,0x84), Color.FromRgb(0xA8,0x4F,0x64)),
+        new PicketColorScheme("midnight", "Midnight",
+            Color.FromRgb(0x13,0x1B,0x29), Color.FromRgb(0x1D,0x35,0x55),
+            Color.FromRgb(0x49,0x6B,0x91), Color.FromRgb(0x58,0x9B,0xD5)),
+        new PicketColorScheme("graphite", "Graphite",
+            Color.FromRgb(0x18,0x1B,0x20), Color.FromRgb(0x29,0x2E,0x36),
+            Color.FromRgb(0x58,0x61,0x6E), Color.FromRgb(0x8A,0xA0,0xB8)),
     };
+
+    private static readonly Dictionary<string, string> LegacyAliases =
+        new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
+        {
+            ["white"] = "porcelain", ["stone"] = "porcelain", ["cloud"] = "porcelain",
+            ["frost"] = "porcelain",
+            ["sand"] = "sandstone", ["butter"] = "sandstone", ["dune"] = "sandstone",
+            ["peach"] = "sandstone", ["apricot"] = "sandstone",
+            ["mint"] = "sage", ["grove"] = "sage",
+            ["sky"] = "ocean", ["teal"] = "ocean",
+            ["lilac"] = "lavender", ["periwinkle"] = "lavender",
+            ["bloom"] = "rose", ["blush"] = "rose", ["coral"] = "rose",
+            ["slate"] = "midnight", ["nightfall"] = "midnight",
+            ["charcoal"] = "graphite", ["black"] = "graphite",
+        };
+
+    public static Color ContrastForeground(Color surface)
+        => ContrastRatio(surface, Ink) >= ContrastRatio(surface, Paper) ? Ink : Paper;
+
+    public static Color HaloFor(Color foreground)
+        => RelativeLuminance(foreground) > 0.5 ? DarkHalo : LightHalo;
+
+    private static double ContrastRatio(Color a, Color b)
+    {
+        var lighter = System.Math.Max(RelativeLuminance(a), RelativeLuminance(b));
+        var darker = System.Math.Min(RelativeLuminance(a), RelativeLuminance(b));
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    private static double RelativeLuminance(Color color)
+    {
+        static double Linear(byte channel)
+        {
+            var value = channel / 255.0;
+            return value <= 0.04045 ? value / 12.92 : System.Math.Pow((value + 0.055) / 1.055, 2.4);
+        }
+
+        return 0.2126 * Linear(color.R) + 0.7152 * Linear(color.G) + 0.0722 * Linear(color.B);
+    }
 
     public static PicketColorScheme Get(string? key)
     {
         if (!string.IsNullOrEmpty(key))
-            foreach (var s in All) if (s.Key == key) return s;
+        {
+            if (LegacyAliases.TryGetValue(key, out var replacement)) key = replacement;
+            foreach (var scheme in All)
+                if (scheme.Key.Equals(key, System.StringComparison.OrdinalIgnoreCase)) return scheme;
+        }
         return All[0];
     }
 }

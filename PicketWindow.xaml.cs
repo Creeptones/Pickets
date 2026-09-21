@@ -23,18 +23,12 @@ public partial class PicketWindow : Window
     /// <summary>Raised whenever the picket's persistent state changes (move, resize, item add/remove).</summary>
     public event EventHandler? LayoutChanged;
 
-    // When set, Items mirrors a live folder. Manual drag-drop is disabled; desktop-icon
-    // hiding/restoration is bypassed since portal items live in a real folder, not on the desktop.
-    private FolderPortal? _portal;
-    public bool IsPortal => _portal != null;
-    public string? PortalPath => _portal?.FolderPath;
-
     private bool _isLoading;
     private bool _isCollapsed;
     private double _expandedHeight;
     private bool _isRollAnimating;
     private DispatcherTimer? _rollAnimationTimer;
-    private string _colorKey = "stone";
+    private string _colorKey = "porcelain";
     private string _transparencyKey = "solid";
     private int _transparencyCustomPercent = 50;
     private bool _blurEnabled;
@@ -72,39 +66,37 @@ public partial class PicketWindow : Window
         ItemsHost.ItemsSource = Items;
         _expandedHeight = state.Height;
 
-        _colorKey = state.ColorKey;
+        _colorKey = PicketColors.Get(state.ColorKey).Key;
         _transparencyKey = state.TransparencyKey;
         _transparencyCustomPercent = Math.Clamp(state.TransparencyCustomPercent, 0, 100);
         _blurEnabled = state.BlurEnabled;
         ApplyVisuals();
 
         _isLoading = true;
-        if (!string.IsNullOrEmpty(state.PortalPath))
+        foreach (var i in state.Items)
         {
-            // Portal picket: skip saved items (they're rebuilt from the folder) and start watching.
-            StartPortal(state.PortalPath);
-        }
-        else
-        {
-            foreach (var i in state.Items)
+            if (i.Kind == ItemKind.Label)
             {
-                if (i.Kind == ItemKind.Label)
-                {
-                    Items.Add(PicketItem.CreateLabel(i.LabelText ?? ""));
-                    continue;
-                }
-                var fi = PicketItem.FromPath(i.Path);
-                if (i.HasOriginalPos)
-                    fi.OriginalDesktopPos = new POINT(i.OriginalX!.Value, i.OriginalY!.Value);
-                fi.IsLarge = i.IsLarge;
-                fi.IsMissing = !PathExists(i.Path);
-                Items.Add(fi);
-
-                // Re-apply offscreen position on launch (Explorer may have rearranged).
-                if (i.HasOriginalPos && !fi.IsMissing)
-                    DesktopIconHider.ReapplyHidden(i.Path);
+                Items.Add(PicketItem.CreateLabel(i.LabelText ?? ""));
+                continue;
             }
+            var fi = PicketItem.FromPath(i.Path);
+            if (i.HasOriginalPos)
+                fi.OriginalDesktopPos = new POINT(i.OriginalX!.Value, i.OriginalY!.Value);
+            fi.IsLarge = i.IsLarge;
+            fi.IsMissing = !PathExists(i.Path);
+            Items.Add(fi);
+
+            // Re-apply offscreen position on launch (Explorer may have rearranged).
+            if (i.HasOriginalPos && !fi.IsMissing)
+                DesktopIconHider.ReapplyHidden(i.Path);
         }
+
+        // One-time compatibility path: old folder portals did not persist their mirrored children.
+        // Preserve the user's intent as a normal folder icon, then ToState drops PortalPath forever.
+        if (!string.IsNullOrEmpty(state.PortalPath) && Directory.Exists(state.PortalPath) &&
+            !Items.Any(i => string.Equals(i.Path, state.PortalPath, StringComparison.OrdinalIgnoreCase)))
+            Items.Add(PicketItem.FromPath(state.PortalPath));
         _isLoading = false;
 
         if (state.IsCollapsed)
@@ -125,12 +117,8 @@ public partial class PicketWindow : Window
         ColorKey = _colorKey,
         TransparencyKey = _transparencyKey,
         TransparencyCustomPercent = _transparencyCustomPercent,
-        PortalPath = _portal?.FolderPath,
         BlurEnabled = _blurEnabled,
-        // Portal pickets rebuild Items from the folder on each launch -- don't persist them.
-        Items = IsPortal
-            ? new List<ItemState>()
-            : Items.Select(i => i.Kind == ItemKind.Label
+        Items = Items.Select(i => i.Kind == ItemKind.Label
                 ? new ItemState
                 {
                     Kind = ItemKind.Label,
@@ -256,17 +244,14 @@ public partial class PicketWindow : Window
         if (cluster.Count <= 1) return;
 
         const uint flags = WindowInterop.SWP_NOMOVE | WindowInterop.SWP_NOSIZE | WindowInterop.SWP_NOACTIVATE;
-        foreach (var member in cluster)
+        // Keep lower members above upper members at shared seams. Raising the clicked window last
+        // made its bottom edge cover the first pixel of the title directly beneath it.
+        foreach (var member in cluster.OrderBy(member => member.Top))
         {
-            if (member == this) continue;
             var h = new WindowInteropHelper(member).Handle;
             if (h != IntPtr.Zero)
                 WindowInterop.SetWindowPos(h, WindowInterop.HWND_TOP, 0, 0, 0, 0, flags);
         }
-        // Re-raise self LAST so it ends up on top of the freshly-raised followers.
-        var selfHwnd = new WindowInteropHelper(this).Handle;
-        if (selfHwnd != IntPtr.Zero)
-            WindowInterop.SetWindowPos(selfHwnd, WindowInterop.HWND_TOP, 0, 0, 0, 0, flags);
     }
 
     protected override void OnLocationChanged(EventArgs e)
@@ -310,18 +295,23 @@ public partial class PicketWindow : Window
     // === Title bar drag + double-click to roll up ===
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount == 2)
-        {
-            ToggleCollapse();
-            e.Handled = true;
-            return;
-        }
+        // The first click already toggles on release. Ignore the second half of a double-click so
+        // the fence does not immediately toggle back to its starting state.
+        if (e.ClickCount > 1) { e.Handled = true; return; }
         if (e.ClickCount == 1 && e.LeftButton == MouseButtonState.Pressed)
         {
             ClearSelection();
+            var startLeft = Left;
+            var startTop = Top;
             BeginGroupDrag();
             try { DragMove(); }                   // blocks until the user releases
             finally { _dragCluster = null; }
+
+            // A title is both the drag handle and the accordion trigger. Treat a release without
+            // meaningful movement as a click; actual drags retain the existing group-move behavior.
+            if (Math.Abs(Left - startLeft) < 2 && Math.Abs(Top - startTop) < 2)
+                ToggleCollapse();
+            e.Handled = true;
         }
     }
 
@@ -424,6 +414,30 @@ public partial class PicketWindow : Window
     {
         if (UnlinkBtn == null) return;  // pre-XAML-init guard
         UnlinkBtn.Visibility = HasTouchingNeighbor() ? Visibility.Visible : Visibility.Collapsed;
+        RefreshStackChrome();
+    }
+
+    /// <summary>Makes a vertical run of separate native windows read as one continuous component.
+    /// Only the outside of the group is rounded; internal top borders become consistent dividers.</summary>
+    private void RefreshStackChrome()
+    {
+        if (Application.Current is not App app || OuterShell == null || TitleShell == null) return;
+
+        var aligned = app.Pickets.Where(other => other != this && HorizontallyOverlaps(other, this));
+        var hasAbove = aligned.Any(other => other.Top < Top &&
+            Math.Abs(other.Top + other.Height - Top) <= GROUP_GAP);
+        var hasBelow = aligned.Any(other => other.Top > Top &&
+            Math.Abs(Top + Height - other.Top) <= GROUP_GAP);
+
+        OuterShell.CornerRadius = new CornerRadius(
+            hasAbove ? 0 : 9, hasAbove ? 0 : 9,
+            hasBelow ? 0 : 9, hasBelow ? 0 : 9);
+        OuterShell.BorderThickness = new Thickness(1, 1, 1, hasBelow ? 0 : 1);
+
+        var roundTitleBottom = _isCollapsed && !hasBelow;
+        TitleShell.CornerRadius = new CornerRadius(
+            hasAbove ? 0 : 9, hasAbove ? 0 : 9,
+            roundTitleBottom ? 9 : 0, roundTitleBottom ? 9 : 0);
     }
 
     private bool HasTouchingNeighbor()
@@ -445,10 +459,7 @@ public partial class PicketWindow : Window
                 "Pickets", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        var msg = IsPortal
-            ? "Delete this folder portal? The underlying folder is not affected."
-            : "Delete this picket? Captured icons will be restored to the desktop.";
-        var result = MessageBox.Show(msg, "Pickets",
+        var result = MessageBox.Show("Delete this picket? Captured icons will be restored to the desktop.", "Pickets",
             MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (result != MessageBoxResult.OK) return;
         if (Application.Current is App app2) app2.DeletePicket(this);
@@ -481,11 +492,22 @@ public partial class PicketWindow : Window
     private void TitleMenu_SetColor_Click(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem mi && mi.Tag is string key)
-        {
-            _colorKey = key;
-            ApplyVisuals();
-            RaiseLayoutChanged();
-        }
+            ApplyColorTheme(key);
+    }
+
+    private void TitleMenu_ApplyColorToAll_Click(object sender, RoutedEventArgs e)
+    {
+        if (Application.Current is App app)
+            app.ApplyColorThemeToAll(_colorKey);
+    }
+
+    /// <summary>Applies one canonical theme to this Picket. Used by both individual selection and
+    /// the app-wide action so every path gets identical normalization, repaint, and persistence.</summary>
+    public void ApplyColorTheme(string key)
+    {
+        _colorKey = PicketColors.Get(key).Key;
+        ApplyVisuals();
+        RaiseLayoutChanged();
     }
 
     private void TitleMenu_SetTransparency_Click(object sender, RoutedEventArgs e)
@@ -504,7 +526,6 @@ public partial class PicketWindow : Window
         if (sender is not FrameworkElement fe || fe.ContextMenu is not ContextMenu cm) return;
         RefreshSubmenuChecks(cm, "ColorMenu", _colorKey);
         RefreshSubmenuChecks(cm, "TransparencyMenu", _transparencyKey);
-        SetPortalMenuVisibility(cm);
         RefreshBlurCheck(cm);
         RefreshLaunchAtLoginCheck(cm);
 
@@ -521,7 +542,7 @@ public partial class PicketWindow : Window
 
     private static void RefreshSubmenuChecks(ContextMenu cm, string parentTag, string selectedKey)
     {
-        var parent = cm.Items.OfType<MenuItem>().FirstOrDefault(mi => parentTag.Equals(mi.Tag));
+        var parent = FindMenuItemByTag(cm.Items, parentTag);
         if (parent == null) return;
         foreach (var item in parent.Items.OfType<MenuItem>())
             item.IsChecked = item.Tag is string key && key == selectedKey;
@@ -529,12 +550,23 @@ public partial class PicketWindow : Window
 
     private static (Slider? slider, TextBlock? label) FindCustomSliderAndLabel(ContextMenu cm)
     {
-        var transparencyMenu = cm.Items.OfType<MenuItem>().FirstOrDefault(mi => "TransparencyMenu".Equals(mi.Tag));
+        var transparencyMenu = FindMenuItemByTag(cm.Items, "TransparencyMenu");
         var customItem = transparencyMenu?.Items.OfType<MenuItem>().FirstOrDefault(mi => "custom".Equals(mi.Tag));
         if (customItem?.Header is not StackPanel sp) return (null, null);
         var slider = sp.Children.OfType<Slider>().FirstOrDefault(s => "CustomSlider".Equals(s.Tag));
         var label  = sp.Children.OfType<TextBlock>().FirstOrDefault(t => "CustomLabel".Equals(t.Tag));
         return (slider, label);
+    }
+
+    private static MenuItem? FindMenuItemByTag(ItemCollection items, string tag)
+    {
+        foreach (var item in items.OfType<MenuItem>())
+        {
+            if (tag.Equals(item.Tag)) return item;
+            var nested = FindMenuItemByTag(item.Items, tag);
+            if (nested != null) return nested;
+        }
+        return null;
     }
 
     private void TransparencyCustomSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -565,22 +597,53 @@ public partial class PicketWindow : Window
         // sits on top of the blur and defeats it. We use alpha=1 (not 0) because this window is
         // layered (AllowsTransparency=True): fully transparent pixels are click-through at the OS
         // level, so Explorer drops would fall past the picket onto the desktop behind it.
-        Color bgColor = _blurEnabled ? Color.FromArgb(1, 0, 0, 0) : ScaleAlpha(scheme.Background, factor);
-        var bg     = new SolidColorBrush(bgColor);
-        var titleB = new SolidColorBrush(ScaleAlpha(scheme.TitleBackground, factor));
-        var border = new SolidColorBrush(ScaleAlpha(scheme.Border,          factor));
-        var fg     = new SolidColorBrush(scheme.Foreground); // text always opaque
-        bg.Freeze(); titleB.Freeze(); border.Freeze(); fg.Freeze();
+        Color bgColor = _blurEnabled
+            ? Color.FromArgb(1, 0, 0, 0)
+            : ScaleAlpha(scheme.Background, factor);
+        var bg = FrozenBrush(bgColor);
+        // Transparency applies fully to the content canvas, but navigation chrome keeps enough
+        // surface behind its contrast-selected text to remain readable on any wallpaper.
+        var chromeFactor = Math.Max(0.72, factor);
+        var titleB   = FrozenBrush(ScaleAlpha(scheme.TitleBackground, chromeFactor));
+        var border   = FrozenBrush(ScaleAlpha(scheme.Border, Math.Max(0.55, factor)));
+        var titleFg  = FrozenBrush(scheme.TitleForeground); // text always opaque
+        var itemFg   = FrozenBrush(scheme.ItemForeground);
+
+        // Interactive states use the theme accent, tying selection, hover, section labels, and the
+        // rename field into the same visual system as the title/body surfaces.
+        var controlHover = FrozenBrush(Color.FromArgb(0x32, scheme.Accent.R,
+            scheme.Accent.G, scheme.Accent.B));
+        var itemHover = FrozenBrush(Color.FromArgb(0x20, scheme.Accent.R,
+            scheme.Accent.G, scheme.Accent.B));
+        var sectionBg = FrozenBrush(Color.FromArgb(0x26, scheme.Accent.R,
+            scheme.Accent.G, scheme.Accent.B));
+        var editorBg = FrozenBrush(Color.FromArgb(0x24, scheme.TitleForeground.R,
+            scheme.TitleForeground.G, scheme.TitleForeground.B));
+        var editorBorder = FrozenBrush(Color.FromArgb(0x99, scheme.Accent.R,
+            scheme.Accent.G, scheme.Accent.B));
+        var selectionBg = FrozenBrush(Color.FromArgb(0x48, scheme.Accent.R,
+            scheme.Accent.G, scheme.Accent.B));
+        var selectionBorder = FrozenBrush(Color.FromArgb(0xC0, scheme.Accent.R,
+            scheme.Accent.G, scheme.Accent.B));
 
         OuterShell.Background = bg;
         OuterShell.BorderBrush = border;
         TitleShell.Background = titleB;
-        TitleText.Foreground = fg;
-        TitleEditBox.Foreground = fg;
-        TitleEditBox.CaretBrush = fg;
-        Resources["PicketItemForeground"] = fg;
+        TitleText.Foreground = titleFg;
+        TitleEditBox.Foreground = titleFg;
+        TitleEditBox.CaretBrush = titleFg;
+        Resources["PicketTitleForeground"] = titleFg;
+        Resources["PicketItemForeground"] = itemFg;
+        Resources["PicketControlHoverBrush"] = controlHover;
+        Resources["PicketItemHoverBrush"] = itemHover;
+        Resources["PicketSectionBackground"] = sectionBg;
+        Resources["PicketEditorBackground"] = editorBg;
+        Resources["PicketEditorBorder"] = editorBorder;
+        Resources["PicketSelectionBackground"] = selectionBg;
+        Resources["PicketSelectionBorder"] = selectionBorder;
         // Label halo is a Color (not a Brush) because DropShadowEffect.Color takes a Color DP.
-        Resources["PicketItemShadowColor"] = scheme.Shadow;
+        Resources["PicketTitleShadowColor"] = scheme.TitleShadow;
+        Resources["PicketItemShadowColor"] = scheme.ItemShadow;
 
         ApplyBlur();
     }
@@ -602,6 +665,14 @@ public partial class PicketWindow : Window
         var a = (byte)Math.Clamp((int)Math.Round(c.A * factor), 0, 255);
         return Color.FromArgb(a, c.R, c.G, c.B);
     }
+
+    private static SolidColorBrush FrozenBrush(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
+
 
     // === Inline rename ===
     private void BeginRename()
@@ -685,50 +756,43 @@ public partial class PicketWindow : Window
     /// </summary>
     private void AnimateCollapseState(bool collapsed)
     {
-        var cluster = ComputeTouchingCluster();
+        var cluster = ComputeTouchingCluster()
+            .Where(p => HorizontallyOverlaps(p, this))
+            .OrderBy(p => p.Top)
+            .ToList();
         var startHeight = Height;
         if (collapsed) _expandedHeight = startHeight;
 
         var targetHeight = collapsed ? CollapsedHeight : Math.Max(CollapsedHeight, _expandedHeight);
-        var followers = cluster
-            .Where(p => p != this && p.Top > Top + 1 && HorizontallyOverlaps(p, this))
-            .ToHashSet();
 
-        // Layouts saved by older builds may already have the collapsed tabs underneath an expanded
-        // body. On their first close those tabs are already in the right compact positions, so do
-        // not pull them upward a second time. Newly flowed stacks sit at this window's bottom edge.
-        var followersAlreadyFlowed = followers.Count == 0 ||
-            followers.Min(p => p.Top) >= Top + startHeight - GROUP_GAP;
-
-        // If the opened stack would run past the taskbar, first use any free space above it. If the
-        // complete stack is taller than the monitor, cap only the opened body; every title remains
-        // reachable and the preferred expanded height is retained for a roomier monitor/layout.
-        var delta = targetHeight - startHeight;
-        var followerDelta = collapsed && !followersAlreadyFlowed ? 0 : delta;
+        // The target is rebuilt from the top down rather than offset from today's positions. This
+        // repairs old overlaps, fractional DPI drift, and uneven gaps every time a tab is toggled.
+        var targetHeights = cluster.ToDictionary(p => p, p => p == this ? targetHeight : p.Height);
         if (!collapsed && TryGetWorkAreaVertical(out var workTop, out var workBottom))
         {
-            var minTop = cluster.Min(p => p.Top);
-            var maxBottom = cluster.Max(p =>
-                p.Top + (followers.Contains(p) ? followerDelta : 0) + (p == this ? targetHeight : p.Height));
-            var excess = Math.Max(0, (maxBottom - minTop) - (workBottom - workTop));
+            var excess = Math.Max(0, targetHeights.Values.Sum() - (workBottom - workTop));
             if (excess > 0)
             {
                 targetHeight = Math.Max(CollapsedHeight, targetHeight - excess);
-                delta = targetHeight - startHeight;
-                followerDelta = delta;
+                targetHeights[this] = targetHeight;
             }
         }
 
         var startTops = cluster.ToDictionary(p => p, p => p.Top);
-        var targetTops = cluster.ToDictionary(
-            p => p,
-            p => p.Top + (followers.Contains(p) ? followerDelta : 0));
+        var dpiScale = VisualTreeHelper.GetDpi(this).DpiScaleY;
+        double AlignToPixel(double value) => Math.Round(value * dpiScale) / dpiScale;
+        var targetTops = new Dictionary<PicketWindow, double>();
+        var cursor = AlignToPixel(cluster[0].Top);
+        foreach (var p in cluster)
+        {
+            targetTops[p] = cursor;
+            cursor = AlignToPixel(cursor + targetHeights[p]);
+        }
 
         if (TryGetWorkAreaVertical(out var visibleTop, out var visibleBottom))
         {
             var finalMinTop = targetTops.Values.Min();
-            var finalMaxBottom = cluster.Max(p =>
-                targetTops[p] + (p == this ? targetHeight : p.Height));
+            var finalMaxBottom = cluster.Max(p => targetTops[p] + targetHeights[p]);
             var groupShift = finalMaxBottom > visibleBottom
                 ? visibleBottom - finalMaxBottom
                 : finalMinTop < visibleTop
@@ -736,7 +800,7 @@ public partial class PicketWindow : Window
                     : 0;
 
             if (groupShift != 0)
-                foreach (var p in cluster) targetTops[p] += groupShift;
+                foreach (var p in cluster) targetTops[p] = AlignToPixel(targetTops[p] + groupShift);
         }
 
         foreach (var p in cluster) p._isRollAnimating = true;
@@ -861,14 +925,23 @@ public partial class PicketWindow : Window
     }
 
     // === Drag-drop into the picket body ===
+    private const string PicketItemDragFormat = "Pickets.PicketItemDrag";
+    private sealed record PicketItemDragPayload(PicketWindow Source, PicketItem Item);
+
     private bool _loggedFirstDragOver;
     private void ItemsHost_DragOver(object sender, DragEventArgs e)
     {
         if (!_loggedFirstDragOver)
         {
             _loggedFirstDragOver = true;
-            Logger.Log($"ItemsHost_DragOver first hit. blur={_blurEnabled} isPortal={IsPortal} " +
+            Logger.Log($"ItemsHost_DragOver first hit. blur={_blurEnabled} " +
                        $"hasFileDrop={e.Data.GetDataPresent(DataFormats.FileDrop)}");
+        }
+        if (e.Data.GetDataPresent(PicketItemDragFormat))
+        {
+            e.Effects = DragDropEffects.Move;
+            e.Handled = true;
+            return;
         }
         if (!e.Data.GetDataPresent(DataFormats.FileDrop))
         {
@@ -876,48 +949,39 @@ public partial class PicketWindow : Window
             e.Handled = true;
             return;
         }
-        if (IsPortal)
-        {
-            // Portals mirror their folder on disk. Dropping moves (or copies with Ctrl) the
-            // dragged items into that folder; the watcher surfaces them as picket items.
-            bool copy = (e.KeyStates & DragDropKeyStates.ControlKey) == DragDropKeyStates.ControlKey;
-            e.Effects = copy ? DragDropEffects.Copy : DragDropEffects.Move;
-        }
-        else
-        {
-            e.Effects = DragDropEffects.Link;
-        }
+        e.Effects = DragDropEffects.Link;
         e.Handled = true;
     }
 
     private void ItemsHost_Drop(object sender, DragEventArgs e)
     {
-        Logger.Log($"ItemsHost_Drop fired. blur={_blurEnabled} isPortal={IsPortal} " +
+        Logger.Log($"ItemsHost_Drop fired. blur={_blurEnabled} " +
                    $"hasFileDrop={e.Data.GetDataPresent(DataFormats.FileDrop)}");
-        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) { e.Handled = true; return; }
-        var paths = (string[])e.Data.GetData(DataFormats.FileDrop)!;
-
-        if (IsPortal)
+        // An in-process transfer keeps the captured desktop position with the item. Treating it as
+        // a new FileDrop would lose that ownership metadata and leave a duplicate in the source.
+        var internalPayload = e.Data.GetDataPresent(PicketItemDragFormat)
+            ? e.Data.GetData(PicketItemDragFormat) as PicketItemDragPayload
+            : null;
+        if (internalPayload is PicketItemDragPayload payload)
         {
-            bool copy = (e.KeyStates & DragDropKeyStates.ControlKey) == DragDropKeyStates.ControlKey;
-            var destFolder = PortalPath!;
-            foreach (var src in paths)
+            if (payload.Source != this && !Items.Any(it =>
+                    string.Equals(it.Path, payload.Item.Path, StringComparison.OrdinalIgnoreCase)))
             {
-                try { MoveOrCopyIntoFolder(src, destFolder, copy); }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Portal drop failed for '{src}' -> '{destFolder}': {ex.Message}");
-                    MessageBox.Show(
-                        $"Could not {(copy ? "copy" : "move")} '{Path.GetFileName(src)}':\n{ex.Message}",
-                        "Pickets", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
+                payload.Source.Items.Remove(payload.Item);
+                payload.Item.IsSelected = false;
+                Items.Add(payload.Item);
             }
-            // We performed the file operation ourselves; report the effect so the source app
-            // doesn't attempt its own follow-up delete.
-            e.Effects = copy ? DragDropEffects.Copy : DragDropEffects.Move;
+            e.Effects = DragDropEffects.Move;
             e.Handled = true;
             return;
         }
+
+        var paths = e.Data.GetDataPresent(DataFormats.FileDrop)
+            ? (string[])e.Data.GetData(DataFormats.FileDrop)!
+            : internalPayload != null
+                ? new[] { internalPayload.Item.Path }
+                : Array.Empty<string>();
+        if (paths.Length == 0) { e.Handled = true; return; }
 
         foreach (var p in paths)
         {
@@ -932,81 +996,18 @@ public partial class PicketWindow : Window
         e.Handled = true;
     }
 
-    private static void MoveOrCopyIntoFolder(string src, string destFolder, bool copy)
-    {
-        var trimmed = src.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var name = Path.GetFileName(trimmed);
-        if (string.IsNullOrEmpty(name)) throw new IOException($"Invalid source path '{src}'");
-
-        var dest = Path.Combine(destFolder, name);
-
-        // Dropping an item back into its own folder is a no-op.
-        var srcFull = Path.GetFullPath(src);
-        var destFull = Path.GetFullPath(dest);
-        if (string.Equals(srcFull, destFull, StringComparison.OrdinalIgnoreCase)) return;
-
-        dest = MakeUniquePath(dest);
-
-        var attr = File.GetAttributes(src);
-        bool isDir = (attr & FileAttributes.Directory) != 0;
-
-        if (copy)
-        {
-            if (isDir) CopyDirectoryRecursive(src, dest);
-            else File.Copy(src, dest);
-        }
-        else
-        {
-            if (isDir)
-            {
-                try
-                {
-                    Directory.Move(src, dest);
-                }
-                catch (IOException)
-                {
-                    // Cross-volume Directory.Move fails -- fall back to copy + delete.
-                    CopyDirectoryRecursive(src, dest);
-                    Directory.Delete(src, recursive: true);
-                }
-            }
-            else
-            {
-                File.Move(src, dest);
-            }
-        }
-    }
-
-    private static string MakeUniquePath(string path)
-    {
-        if (!File.Exists(path) && !Directory.Exists(path)) return path;
-        var dir = Path.GetDirectoryName(path)!;
-        var stem = Path.GetFileNameWithoutExtension(path);
-        var ext = Path.GetExtension(path);
-        for (int i = 2; i < 1000; i++)
-        {
-            var candidate = Path.Combine(dir, $"{stem} ({i}){ext}");
-            if (!File.Exists(candidate) && !Directory.Exists(candidate)) return candidate;
-        }
-        throw new IOException($"Could not find a unique name for '{path}'");
-    }
-
-    private static void CopyDirectoryRecursive(string src, string dest)
-    {
-        Directory.CreateDirectory(dest);
-        foreach (var file in Directory.EnumerateFiles(src))
-            File.Copy(file, Path.Combine(dest, Path.GetFileName(file)));
-        foreach (var sub in Directory.EnumerateDirectories(src))
-            CopyDirectoryRecursive(sub, Path.Combine(dest, Path.GetFileName(sub)));
-    }
-
     // === Item interactions ===
+    private Point? _itemDragStart;
+    private FrameworkElement? _itemDragSource;
+    private PicketItem? _itemDragItem;
+
     private void Item_MouseDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not FrameworkElement fe || fe.DataContext is not PicketItem item) return;
 
         if (e.ClickCount == 2)
         {
+            ResetItemDragCandidate();
             LaunchItem(item);
             e.Handled = true;
             return;
@@ -1023,7 +1024,91 @@ public partial class PicketWindow : Window
             ClearSelection(except: item);
             item.IsSelected = true;
         }
+
+        _itemDragStart = e.GetPosition(this);
+        _itemDragSource = fe;
+        _itemDragItem = item;
         e.Handled = true;
+    }
+
+    private void Item_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _itemDragStart == null ||
+            _itemDragSource == null || _itemDragItem == null) return;
+
+        var current = e.GetPosition(this);
+        var start = _itemDragStart.Value;
+        if (Math.Abs(current.X - start.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(current.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+
+        var source = _itemDragSource;
+        var item = _itemDragItem;
+        ResetItemDragCandidate();
+
+        if (item.IsMissing || !PathExists(item.Path)) return;
+
+        var data = new DataObject();
+        data.SetData(PicketItemDragFormat, new PicketItemDragPayload(this, item));
+        // Captured desktop items already live in the Desktop folder. Advertising FileDrop makes
+        // Explorer attempt a same-folder move and display "source and destination are the same".
+        // Keep those gestures private to Pickets; uncaptured items remain standard file drags.
+        if (!item.OriginalDesktopPos.HasValue)
+            data.SetData(DataFormats.FileDrop, new[] { item.Path });
+
+        var canceled = false;
+        QueryContinueDragEventHandler cancelTracker = (_, args) =>
+        {
+            if (args.EscapePressed) canceled = true;
+        };
+
+        source.QueryContinueDrag += cancelTracker;
+        try
+        {
+            DragDrop.DoDragDrop(source, data,
+                DragDropEffects.Copy | DragDropEffects.Move | DragDropEffects.Link);
+        }
+        finally
+        {
+            source.QueryContinueDrag -= cancelTracker;
+        }
+
+        // A drop onto the desktop can report None because the filesystem item already lives there.
+        // Cursor location, plus explicit Escape tracking, tells that valid gesture from cancellation.
+        if (canceled || !Items.Contains(item) ||
+            !WindowInterop.GetCursorPos(out var cursor) || IsPointInsideAnyPicket(cursor)) return;
+
+        if (item.OriginalDesktopPos.HasValue)
+        {
+            var dropPosition = new POINT(cursor.X - 32, cursor.Y - 32);
+            if (!DesktopIconHider.Restore(item.Path, dropPosition) &&
+                !dropPosition.Equals(item.OriginalDesktopPos.Value))
+                DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value);
+        }
+        Items.Remove(item);
+        e.Handled = true;
+    }
+
+    private void Item_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => ResetItemDragCandidate();
+
+    private void ResetItemDragCandidate()
+    {
+        _itemDragStart = null;
+        _itemDragSource = null;
+        _itemDragItem = null;
+    }
+
+    private static bool IsPointInsideAnyPicket(POINT point)
+    {
+        if (Application.Current is not App app) return false;
+        foreach (var picket in app.Pickets)
+        {
+            var hwnd = new WindowInteropHelper(picket).Handle;
+            if (hwnd == IntPtr.Zero || !WindowInterop.GetWindowRect(hwnd, out var rect)) continue;
+            if (point.X >= rect.left && point.X < rect.right &&
+                point.Y >= rect.top && point.Y < rect.bottom) return true;
+        }
+        return false;
     }
 
     private void ClearSelection(PicketItem? except = null)
@@ -1049,12 +1134,6 @@ public partial class PicketWindow : Window
                 .FirstOrDefault(mi => "LargeToggle".Equals(mi.Tag));
             if (largeItem != null) largeItem.IsChecked = item.IsLarge;
 
-            // Labels don't belong inside portal pickets (they're derived from the folder), so
-            // hide "Insert label above..." on portal items.
-            var insertLabel = cm.Items.OfType<MenuItem>()
-                .FirstOrDefault(mi => mi.Header is string s && s.StartsWith("Insert label"));
-            if (insertLabel != null)
-                insertLabel.Visibility = IsPortal ? Visibility.Collapsed : Visibility.Visible;
         }
     }
 
@@ -1099,7 +1178,7 @@ public partial class PicketWindow : Window
         }
     }
 
-    private void LaunchItem(PicketItem item)
+    private static void LaunchItem(PicketItem item)
     {
         if (item.IsMissing)
         {
@@ -1118,161 +1197,12 @@ public partial class PicketWindow : Window
         }
     }
 
-    // === Folder portal ===
-    private void TitleMenu_ConvertToPortal_Click(object sender, RoutedEventArgs e)
-    {
-        if (IsPortal) return;
-
-        var dialog = new Microsoft.Win32.OpenFolderDialog
-        {
-            Title = "Pick a folder to mirror in this picket",
-        };
-        if (dialog.ShowDialog(this) != true) return;
-
-        var folderPath = dialog.FolderName;
-        if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath)) return;
-
-        // Warn before wiping a non-empty picket so an accidental convert doesn't quietly
-        // discard manually curated items. Captured desktop icons are restored either way.
-        if (Items.Count > 0)
-        {
-            var result = MessageBox.Show(
-                "Converting this picket to a folder portal will remove its current items. " +
-                "Any captured desktop icons will be restored to the desktop.\n\nContinue?",
-                "Pickets", MessageBoxButton.OKCancel, MessageBoxImage.Question);
-            if (result != MessageBoxResult.OK) return;
-
-            foreach (var item in Items.ToList())
-            {
-                if (item.OriginalDesktopPos.HasValue && !item.IsMissing)
-                    DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value);
-            }
-        }
-        Items.Clear();
-
-        StartPortal(folderPath);
-
-        // Default title to the folder name (TrimEnd handles drive roots like "C:\").
-        var folderName = System.IO.Path.GetFileName(folderPath.TrimEnd(
-            System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
-        if (!string.IsNullOrEmpty(folderName)) TitleText.Text = folderName;
-
-        RaiseLayoutChanged();
-    }
-
-    private void TitleMenu_OpenPortalFolder_Click(object sender, RoutedEventArgs e)
-    {
-        if (_portal == null) return;
-        try
-        {
-            Process.Start(new ProcessStartInfo(_portal.FolderPath) { UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(ex.Message, "Pickets", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-    }
-
-    private void TitleMenu_DisconnectPortal_Click(object sender, RoutedEventArgs e)
-    {
-        if (_portal == null) return;
-        StopPortal();
-        Items.Clear();
-        RaiseLayoutChanged();
-    }
-
-    private void StartPortal(string folderPath)
-    {
-        _portal = new FolderPortal(folderPath, Dispatcher);
-        _portal.ItemAdded   += OnPortalItemAdded;
-        _portal.ItemRemoved += OnPortalItemRemoved;
-        _portal.ItemRenamed += OnPortalItemRenamed;
-        _portal.Start();
-    }
-
-    private void StopPortal()
-    {
-        if (_portal == null) return;
-        _portal.ItemAdded   -= OnPortalItemAdded;
-        _portal.ItemRemoved -= OnPortalItemRemoved;
-        _portal.ItemRenamed -= OnPortalItemRenamed;
-        _portal.Dispose();
-        _portal = null;
-    }
-
-    private void OnPortalItemAdded(string path)
-    {
-        if (Items.Any(i => string.Equals(i.Path, path, StringComparison.OrdinalIgnoreCase)))
-            return; // dedupe: initial scan + Created events can race on the same path
-        var item = PicketItem.FromPath(path);
-        Items.Insert(FindPortalInsertIndex(item), item);
-    }
-
-    private void OnPortalItemRemoved(string path)
-    {
-        var match = Items.FirstOrDefault(i =>
-            string.Equals(i.Path, path, StringComparison.OrdinalIgnoreCase));
-        if (match != null) Items.Remove(match);
-    }
-
-    private void OnPortalItemRenamed(string oldPath, string newPath)
-    {
-        OnPortalItemRemoved(oldPath);
-        OnPortalItemAdded(newPath);
-    }
-
-    /// <summary>Returns the index at which `item` should be inserted to maintain
-    /// folders-first, case-insensitive alphabetical ordering.</summary>
-    private int FindPortalInsertIndex(PicketItem item)
-    {
-        for (int i = 0; i < Items.Count; i++)
-        {
-            var existing = Items[i];
-            if (item.IsFolder && !existing.IsFolder) return i;
-            if (!item.IsFolder && existing.IsFolder) continue;
-            if (string.Compare(item.DisplayName, existing.DisplayName,
-                               StringComparison.OrdinalIgnoreCase) < 0) return i;
-        }
-        return Items.Count;
-    }
-
-    private void SetPortalMenuVisibility(ContextMenu cm)
-    {
-        bool isPortal = IsPortal;
-        foreach (var obj in cm.Items)
-        {
-            if (obj is not FrameworkElement fe || fe.Tag is not string tag) continue;
-            switch (tag)
-            {
-                case "ConvertToPortal":
-                    fe.Visibility = isPortal ? Visibility.Collapsed : Visibility.Visible;
-                    break;
-                case "OpenPortalFolder":
-                case "DisconnectPortal":
-                    fe.Visibility = isPortal ? Visibility.Visible : Visibility.Collapsed;
-                    break;
-            }
-        }
-    }
-
-    protected override void OnClosed(EventArgs e)
-    {
-        StopPortal();
-        base.OnClosed(e);
-    }
-
     // File.Exists returns false for directories, which would flag every dropped folder as missing.
     private static bool PathExists(string p) => File.Exists(p) || Directory.Exists(p);
 
     // === Section labels ===
     private void TitleMenu_AddLabel_Click(object sender, RoutedEventArgs e)
     {
-        if (IsPortal)
-        {
-            MessageBox.Show("Labels can't be added to folder portals -- disconnect the portal first.",
-                "Pickets", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
         var text = InputDialog.Show(this, "Section label", "Label text:", "Section");
         if (string.IsNullOrWhiteSpace(text)) return;
         Items.Add(PicketItem.CreateLabel(text.Trim()));
@@ -1280,7 +1210,6 @@ public partial class PicketWindow : Window
 
     private void ItemMenu_InsertLabelAbove_Click(object sender, RoutedEventArgs e)
     {
-        if (IsPortal) return;
         if (sender is not MenuItem mi || mi.DataContext is not PicketItem clicked) return;
         var text = InputDialog.Show(this, "Section label", "Label text:", "Section");
         if (string.IsNullOrWhiteSpace(text)) return;
@@ -1316,8 +1245,7 @@ public partial class PicketWindow : Window
 
     private void RefreshBlurCheck(ContextMenu cm)
     {
-        var item = cm.Items.OfType<MenuItem>()
-            .FirstOrDefault(mi => "BlurToggle".Equals(mi.Tag));
+        var item = FindMenuItemByTag(cm.Items, "BlurToggle");
         if (item != null) item.IsChecked = _blurEnabled;
     }
 
@@ -1331,8 +1259,7 @@ public partial class PicketWindow : Window
 
     private static void RefreshLaunchAtLoginCheck(ContextMenu cm)
     {
-        var item = cm.Items.OfType<MenuItem>()
-            .FirstOrDefault(mi => "LaunchAtLogin".Equals(mi.Tag));
+        var item = FindMenuItemByTag(cm.Items, "LaunchAtLogin");
         if (item != null) item.IsChecked = StartupEntry.IsEnabled;
     }
 }

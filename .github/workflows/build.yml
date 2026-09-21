@@ -1,0 +1,24 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore Pickets.csproj
+      - name: Build release
+        run: dotnet build Pickets.csproj --configuration Release --no-restore
+      - name: Verify portable package
+        run: dotnet publish Pickets.csproj --configuration Release --property:PublishProfile=win-x64
