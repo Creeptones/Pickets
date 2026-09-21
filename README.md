@@ -47,8 +47,8 @@ The app checks these settings at startup and warns when either one is enabled.
 | Release icons permanently | Choose **Release all icons and quit**, or run with `--restore-icons` |
 
 Rolled-up pickets remain visible as a tidy stack of titles. Pickets snap to screen edges and one
-another, and connected groups move or resize as a single outer frame. Internal edges between
-connected pickets are not resize handles. The title menu also provides eight
+another, and connected groups stay flush, share one size, and move or resize as a single outer
+frame. Internal edges between connected pickets are not resize handles. The title menu also provides eight
 coordinated color systems, transparency levels, optional background blur, section labels, and
 large icons.
 

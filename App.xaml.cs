@@ -267,6 +267,12 @@ public partial class App : Application
             DisplayProfile.ClampToVisibleWorkArea(state);
             SpawnPicket(state);
         }
+
+        // Older layouts allowed small seams and fractional size differences inside a connected
+        // group. Repair them only after every member exists, so cluster discovery sees the whole
+        // saved stack rather than normalizing one window at a time while it is being spawned.
+        foreach (var picket in _pickets.ToList())
+            picket.NormalizeConnectedGroup();
     }
 
     private void InstallDisplayChangeWatcher()

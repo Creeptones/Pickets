@@ -305,7 +305,11 @@ public partial class PicketWindow : Window
             var startTop = Top;
             BeginGroupDrag();
             try { DragMove(); }                   // blocks until the user releases
-            finally { _dragCluster = null; }
+            finally
+            {
+                _dragCluster = null;
+                NormalizeConnectedGroup();
+            }
 
             // A title is both the drag handle and the accordion trigger. Treat a release without
             // meaningful movement as a click; actual drags retain the existing group-move behavior.
@@ -351,6 +355,94 @@ public partial class PicketWindow : Window
     // together. Looser than requiring flush edges, so a stacked column or an overlapping pile still
     // moves as a unit. Kept below the unlink push (SHIFT) so "unlink" can still break a group apart.
     private const double GROUP_GAP = 20.0;
+
+    /// <summary>
+    /// Pulls a simple connected row or column into one flush, consistently sized component.
+    /// GROUP_GAP intentionally remains generous enough to recognize older saved layouts with small
+    /// seams; once recognized, those seams and fractional-DPI width/height drift are removed.
+    /// Complex two-dimensional arrangements are left alone rather than being flattened into a row.
+    /// </summary>
+    public void NormalizeConnectedGroup()
+    {
+        var cluster = ComputeTouchingCluster();
+        if (cluster.Count <= 1) return;
+
+        var orientation = GetSimpleGroupOrientation(cluster);
+        if (orientation == GroupOrientation.None) return;
+
+        var ordered = orientation == GroupOrientation.Column
+            ? cluster.OrderBy(p => p.Top).ToList()
+            : cluster.OrderBy(p => p.Left).ToList();
+        var reference = ordered[0];
+        var targetWidth = Math.Max(reference.MinWidth, reference.Width);
+        var targetExpandedHeight = Math.Max(reference.MinHeight,
+            reference._isCollapsed ? reference._expandedHeight : reference.Height);
+
+        foreach (var p in cluster)
+        {
+            p.Width = targetWidth;
+            p._expandedHeight = targetExpandedHeight;
+            if (!p._isCollapsed) p.Height = targetExpandedHeight;
+        }
+
+        ReflowCluster(ordered, orientation);
+        if (Application.Current is App app)
+            foreach (var p in app.Pickets) p.RefreshLinkState();
+    }
+
+    private enum GroupOrientation { None, Column, Row }
+
+    private static GroupOrientation GetSimpleGroupOrientation(IReadOnlyCollection<PicketWindow> cluster)
+    {
+        var commonHorizontalSpan = cluster.Max(p => p.Left) <
+                                   cluster.Min(p => p.Left + p.Width);
+        var commonVerticalSpan = cluster.Max(p => p.Top) <
+                                 cluster.Min(p => p.Top + p.Height);
+
+        if (commonHorizontalSpan && !commonVerticalSpan) return GroupOrientation.Column;
+        if (commonVerticalSpan && !commonHorizontalSpan) return GroupOrientation.Row;
+        if (!commonHorizontalSpan && !commonVerticalSpan) return GroupOrientation.None;
+
+        // Fully overlapping windows satisfy both tests. Preserve the axis on which their centers
+        // are spread farther; exact piles default to a column.
+        var xSpread = cluster.Max(p => p.Left + p.Width / 2) -
+                      cluster.Min(p => p.Left + p.Width / 2);
+        var ySpread = cluster.Max(p => p.Top + p.Height / 2) -
+                      cluster.Min(p => p.Top + p.Height / 2);
+        return ySpread >= xSpread ? GroupOrientation.Column : GroupOrientation.Row;
+    }
+
+    private static void ReflowCluster(List<PicketWindow> ordered,
+                                      GroupOrientation orientation)
+    {
+        if (ordered.Count == 0) return;
+        var dpi = VisualTreeHelper.GetDpi(ordered[0]);
+        double AlignX(double value) => Math.Round(value * dpi.DpiScaleX) / dpi.DpiScaleX;
+        double AlignY(double value) => Math.Round(value * dpi.DpiScaleY) / dpi.DpiScaleY;
+
+        if (orientation == GroupOrientation.Column)
+        {
+            var left = AlignX(ordered[0].Left);
+            var cursor = AlignY(ordered[0].Top);
+            foreach (var p in ordered)
+            {
+                p.Left = left;
+                p.Top = cursor;
+                cursor = AlignY(cursor + p.Height);
+            }
+        }
+        else if (orientation == GroupOrientation.Row)
+        {
+            var top = AlignY(ordered[0].Top);
+            var cursor = AlignX(ordered[0].Left);
+            foreach (var p in ordered)
+            {
+                p.Left = cursor;
+                p.Top = top;
+                cursor = AlignX(cursor + p.Width);
+            }
+        }
+    }
 
     /// <summary>True when two pickets belong to the same drag group: they form a column (overlap
     /// horizontally, within GROUP_GAP vertically), a row (overlap vertically, within GROUP_GAP
@@ -897,62 +989,67 @@ public partial class PicketWindow : Window
     }
 
     // === Resize thumbs ===
-    // A connected cluster resizes as one virtual window. Only members that touch the dragged outer
-    // boundary change size: a vertical stack widens together but grows only at its bottom panel;
-    // a horizontal row grows taller together but widens only at its rightmost panel. The members
-    // are captured once at drag-start so membership stays stable for the whole gesture.
-    private List<PicketWindow>? _resizeRightEdge;
-    private List<PicketWindow>? _resizeBottomEdge;
+    // A connected cluster has one size and resizes as a unit. Reflowing after every delta keeps
+    // adjacent members flush instead of allowing a height/width change to create gaps or overlaps.
+    private List<PicketWindow>? _resizeCluster;
+    private GroupOrientation _resizeOrientation;
 
     private void Resize_DragStarted(object sender, DragStartedEventArgs e)
     {
-        var cluster = ComputeTouchingCluster();
-        var groupRight = cluster.Max(p => p.Left + p.Width);
-        var groupBottom = cluster.Max(p => p.Top + p.Height);
-        _resizeRightEdge = cluster
-            .Where(p => Math.Abs(p.Left + p.Width - groupRight) <= GROUP_GAP)
-            .ToList();
-        _resizeBottomEdge = cluster
-            .Where(p => !p._isCollapsed && Math.Abs(p.Top + p.Height - groupBottom) <= GROUP_GAP)
-            .ToList();
+        NormalizeConnectedGroup();
+        _resizeCluster = ComputeTouchingCluster();
+        _resizeOrientation = GetSimpleGroupOrientation(_resizeCluster);
     }
 
     private void Resize_DragCompleted(object sender, DragCompletedEventArgs e)
     {
-        _resizeRightEdge = null;
-        _resizeBottomEdge = null;
+        _resizeCluster = null;
+        _resizeOrientation = GroupOrientation.None;
         if (Application.Current is App app)
             foreach (var p in app.Pickets) p.RefreshLinkState();
     }
 
-    private static void ResizeWidth(List<PicketWindow>? edge, double requestedChange)
+    private void ResizeClusterWidth(double requestedChange)
     {
-        if (edge == null || edge.Count == 0) return;
-        var change = Math.Max(requestedChange, edge.Max(p => p.MinWidth - p.Width));
-        foreach (var p in edge) p.Width += change;
+        if (_resizeCluster == null || _resizeCluster.Count == 0) return;
+        var target = Math.Max(Width + requestedChange, _resizeCluster.Max(p => p.MinWidth));
+        foreach (var p in _resizeCluster) p.Width = target;
+        ReflowCluster(OrderResizeCluster(), _resizeOrientation);
     }
 
-    private static void ResizeHeight(List<PicketWindow>? edge, double requestedChange)
+    private void ResizeClusterHeight(double requestedChange)
     {
-        if (edge == null || edge.Count == 0) return;
-        var change = Math.Max(requestedChange, edge.Max(p => p.MinHeight - p.Height));
-        foreach (var p in edge) p.Height += change;
+        if (_resizeCluster == null || _resizeCluster.Count == 0) return;
+        var target = Math.Max(Height + requestedChange, _resizeCluster.Max(p => p.MinHeight));
+        foreach (var p in _resizeCluster)
+        {
+            p._expandedHeight = target;
+            if (!p._isCollapsed) p.Height = target;
+        }
+        ReflowCluster(OrderResizeCluster(), _resizeOrientation);
     }
+
+    private List<PicketWindow> OrderResizeCluster()
+        => _resizeCluster == null
+            ? new List<PicketWindow>()
+            : _resizeOrientation == GroupOrientation.Row
+                ? _resizeCluster.OrderBy(p => p.Left).ToList()
+                : _resizeCluster.OrderBy(p => p.Top).ToList();
 
     private void ResizeRight_DragDelta(object sender, DragDeltaEventArgs e)
-        => ResizeWidth(_resizeRightEdge, e.HorizontalChange);
+        => ResizeClusterWidth(e.HorizontalChange);
 
     private void ResizeBottom_DragDelta(object sender, DragDeltaEventArgs e)
     {
         if (_isCollapsed) return;
-        ResizeHeight(_resizeBottomEdge, e.VerticalChange);
+        ResizeClusterHeight(e.VerticalChange);
     }
 
     private void ResizeBottomRight_DragDelta(object sender, DragDeltaEventArgs e)
     {
-        ResizeWidth(_resizeRightEdge, e.HorizontalChange);
+        ResizeClusterWidth(e.HorizontalChange);
         if (_isCollapsed) return;
-        ResizeHeight(_resizeBottomEdge, e.VerticalChange);
+        ResizeClusterHeight(e.VerticalChange);
     }
 
     // === Drag-drop into the picket body ===

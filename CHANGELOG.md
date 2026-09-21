@@ -7,8 +7,8 @@ All notable changes to Pickets are documented here. Versions follow
 
 ### Fixed
 
-- Connected pickets now resize from the group's outside boundary, preventing internal-edge drags
-  from overlapping stacked panels.
+- Connected pickets now keep a single shared size, resize together from the group's outside
+  boundary, and automatically close small gaps left by older layouts.
 
 ## [1.0.0] - 2026-09-21
 
