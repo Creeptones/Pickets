@@ -1,0 +1,23 @@
+Pickets setup is intentionally small and transparent.
+The setup wrapper is built with the open-source Inno Setup project.
+
+WHAT SETUP CHANGES
+
+* Copies one self-contained application, Pickets.exe, to the folder you choose.
+  The default is your per-user Local AppData\Programs\Pickets folder.
+* Adds a Start menu shortcut.
+* Adds a desktop shortcut only if you leave that option selected.
+* Starts Pickets at sign-in only if you explicitly select that option.
+
+WHAT SETUP DOES NOT DO
+
+* It does not require administrator access or install a Windows service or driver.
+* It does not connect to the internet, add telemetry, or create an account.
+* It does not move, upload, or modify your files.
+* It does not change Windows desktop arrangement settings for you.
+
+UNINSTALL AND YOUR DATA
+
+Uninstall first asks Pickets to restore captured desktop icons, then removes the app and installer-
+created shortcuts. Your layout remains in %APPDATA%\Pickets so reinstalling can recover it. You can
+remove that folder manually if you also want to erase saved layouts and diagnostic logs.

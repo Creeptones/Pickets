@@ -23,4 +23,13 @@ jobs:
       - name: Test
         run: dotnet test Pickets.Tests/Pickets.Tests.csproj --configuration Release
       - name: Verify portable package
-        run: dotnet publish Pickets.csproj --configuration Release --property:PublishProfile=win-x64
+        run: dotnet publish Pickets.csproj --configuration Release --property:PublishProfile=win-x64 --output release/portable
+      - name: Install pinned Inno Setup compiler
+        shell: pwsh
+        run: choco install innosetup --version=6.7.1 --no-progress -y
+      - name: Verify installer package
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content Pickets.csproj
+          $version = [string]$project.Project.PropertyGroup.Version
+          ./installer/build-installer.ps1 -Version $version

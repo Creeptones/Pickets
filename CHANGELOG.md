@@ -7,6 +7,8 @@ All notable changes to Pickets are documented here. Versions follow
 
 ### Added
 
+- A transparent per-user installer now defaults to Local AppData, exposes destination, shortcut,
+  and launch-at-login choices, requires no elevation, and restores captured icons on uninstall.
 - A lighter first-run guide now checks required desktop settings, explains why they matter, offers
   desktop-shortcut and launch-at-login setup, and remains available from the tray menu.
 

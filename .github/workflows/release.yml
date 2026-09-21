@@ -34,24 +34,42 @@ jobs:
         run: dotnet test Pickets.Tests/Pickets.Tests.csproj --configuration Release
 
       - name: Publish portable executable
-        run: dotnet publish Pickets.csproj --configuration Release --property:PublishProfile=win-x64 --output release
+        run: dotnet publish Pickets.csproj --configuration Release --property:PublishProfile=win-x64 --output release/portable
 
-      - name: Generate SHA-256 checksum
+      - name: Stage portable download
+        shell: pwsh
+        run: Copy-Item release/portable/Pickets.exe release/Pickets.exe
+
+      - name: Install pinned Inno Setup compiler
+        shell: pwsh
+        run: choco install innosetup --version=6.7.1 --no-progress -y
+
+      - name: Build per-user installer
         shell: pwsh
         run: |
-          $hash = (Get-FileHash release/Pickets.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  Pickets.exe" | Set-Content release/SHA256SUMS.txt -Encoding ascii
+          [xml]$project = Get-Content Pickets.csproj
+          $version = [string]$project.Project.PropertyGroup.Version
+          ./installer/build-installer.ps1 -Version $version
+
+      - name: Generate SHA-256 checksums
+        shell: pwsh
+        run: |
+          @("PicketsSetup.exe", "Pickets.exe") | ForEach-Object {
+            $hash = (Get-FileHash (Join-Path release $_) -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $_"
+          } | Set-Content release/SHA256SUMS.txt -Encoding ascii
 
       - name: Attest build provenance
         uses: actions/attest@v4
         with:
-          subject-path: release/Pickets.exe
+          subject-path: release/*.exe
 
       - name: Preserve workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: Pickets-${{ github.ref_name }}-win-x64
           path: |
+            release/PicketsSetup.exe
             release/Pickets.exe
             release/SHA256SUMS.txt
           if-no-files-found: error
@@ -62,6 +80,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create $env:GITHUB_REF_NAME `
+            release/PicketsSetup.exe `
             release/Pickets.exe `
             release/SHA256SUMS.txt `
             --verify-tag `

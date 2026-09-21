@@ -4,3 +4,9 @@ obj/
 *.suo
 .vs/
 .idea/
+release/
+.build-temp/
+.dotnet/
+.dotnet10/
+.nuget/
+.inno-tool*/

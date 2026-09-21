@@ -60,6 +60,30 @@ public sealed class SingleInstance : IDisposable
     public static void SignalRestoreRequest()
         => Signal(RestoreEventName);
 
+    /// <summary>Waits for the owning instance to release the mutex. Used only by the silent
+    /// uninstall recovery path so setup cannot remove the executable while recovery is active.</summary>
+    public bool WaitForOwnerExit(TimeSpan timeout)
+    {
+        if (IsFirstInstance) return true;
+
+        var acquired = false;
+        try
+        {
+            acquired = _mutex.WaitOne(timeout);
+            return acquired;
+        }
+        catch (AbandonedMutexException)
+        {
+            // The prior process ended without releasing normally; this thread now owns the mutex.
+            acquired = true;
+            return true;
+        }
+        finally
+        {
+            if (acquired) _mutex.ReleaseMutex();
+        }
+    }
+
     private static void Signal(string eventName)
     {
         try

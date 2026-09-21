@@ -8,10 +8,25 @@ A lightweight, offline desktop-icon organizer for Windows. Pickets collects shor
 inside movable, translucent groups that stay at the wallpaper layer of your desktop.
 
 - No accounts, network access, ads, or telemetry.
-- No installer required.
+- Choose a guided per-user installer or a standalone portable build.
 - Your files stay where they are; Pickets manages their desktop presentation.
 
 ## Install and first run
+
+### Recommended: guided installer
+
+1. Download `PicketsSetup.exe` from
+   [GitHub Releases](https://github.com/Creeptones/Pickets/releases).
+2. Review the setup summary and destination. The default is
+   `%LOCALAPPDATA%\Programs\Pickets`, and **Browse** lets you choose another folder.
+3. Choose whether to create a desktop shortcut and whether Pickets should start when you sign in.
+   The shortcut is selected by default; launch-at-login is opt-in.
+4. Select **Install**, then use the short first-run guide to check the two required desktop settings.
+
+Setup is per-user and does not request administrator access. It installs one self-contained
+executable plus the shortcuts you select—no service, driver, account, network access, or telemetry.
+
+### Portable option
 
 1. Download the latest portable `Pickets.exe` from
    [GitHub Releases](https://github.com/Creeptones/Pickets/releases).
@@ -21,8 +36,9 @@ inside movable, translucent groups that stay at the wallpaper layer of your desk
 3. Run `Pickets.exe`. The short first-run guide checks the two required desktop settings and can
    create a desktop shortcut or start Pickets when you sign in.
 
-Pickets is currently unsigned. Windows SmartScreen may warn the first time it runs; choose
-**More info**, verify that the app is Pickets, and then choose **Run anyway**.
+Both downloads are currently unsigned. Windows SmartScreen may warn the first time either runs;
+choose **More info**, verify that the app is Pickets, and then choose **Run anyway**. Each release
+includes SHA-256 checksums and GitHub build-provenance attestations for both executables.
 
 ## Before first use
 

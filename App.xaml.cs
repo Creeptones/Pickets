@@ -46,7 +46,9 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        var recoveryRequested = e.Args.Any(arg =>
+        var silentRecoveryRequested = e.Args.Any(arg =>
+            arg.Equals("--restore-icons-silent", StringComparison.OrdinalIgnoreCase));
+        var recoveryRequested = silentRecoveryRequested || e.Args.Any(arg =>
             arg.Equals("--restore-icons", StringComparison.OrdinalIgnoreCase));
 
         // Single-instance guard FIRST -- before any desktop manipulation. A second launch must not
@@ -57,6 +59,10 @@ public partial class App : Application
         {
             if (recoveryRequested) SingleInstance.SignalRestoreRequest();
             else                   SingleInstance.SignalExistingInstance();
+            // Uninstall waits for the primary instance to finish restoring icons and release the
+            // executable before setup removes files. Ordinary second launches stay instantaneous.
+            if (silentRecoveryRequested)
+                _singleInstance.WaitForOwnerExit(TimeSpan.FromSeconds(30));
             _isSecondaryInstance = true;
             Shutdown();
             return;
@@ -69,7 +75,7 @@ public partial class App : Application
 
         if (recoveryRequested)
         {
-            RunEmergencyRecovery();
+            RunEmergencyRecovery(silentRecoveryRequested);
             return;
         }
 
@@ -625,7 +631,7 @@ public partial class App : Application
         Shutdown();
     }
 
-    private void RunEmergencyRecovery()
+    private void RunEmergencyRecovery(bool silent = false)
     {
         _isRecoveryMode = true;
         _layout = LayoutStore.Load();
@@ -636,13 +642,16 @@ public partial class App : Application
         LayoutStore.Save(_layout);
         Logger.Log($"Emergency recovery released {restored.Count} of {captured.Count} captured icon(s).");
 
-        MessageBox.Show(
-            $"Emergency recovery restored {restored.Count} of {captured.Count} captured desktop icon(s).\n\n" +
-            (restored.Count == captured.Count
-                ? "Pickets will no longer hide those icons on future launches."
-                : "Icons Windows could not restore remain captured so you can retry recovery later."),
-            "Pickets recovery", MessageBoxButton.OK,
-            restored.Count == captured.Count ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        if (!silent)
+        {
+            MessageBox.Show(
+                $"Emergency recovery restored {restored.Count} of {captured.Count} captured desktop icon(s).\n\n" +
+                (restored.Count == captured.Count
+                    ? "Pickets will no longer hide those icons on future launches."
+                    : "Icons Windows could not restore remain captured so you can retry recovery later."),
+                "Pickets recovery", MessageBoxButton.OK,
+                restored.Count == captured.Count ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
         Shutdown();
     }
 

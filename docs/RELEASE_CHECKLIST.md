@@ -12,11 +12,15 @@
 - [ ] `dotnet test Pickets.Tests/Pickets.Tests.csproj --configuration Release`
 - [ ] `dotnet build Pickets.csproj --configuration Release`
 - [ ] Publish with the `win-x64` profile and confirm the folder contains only `Pickets.exe`.
+- [ ] Build `PicketsSetup.exe`; verify its version metadata and both SHA-256 entries.
 - [ ] Launch the published executable and verify the version in **About Pickets**.
 
 ## Windows interaction matrix
 
 - [ ] Clean first launch on Windows 11 as a standard user.
+- [ ] Install to the default Local AppData destination and to a custom per-user destination.
+- [ ] Verify desktop-shortcut and launch-at-login choices independently, then upgrade in place.
+- [ ] Uninstall with captured icons and confirm they are restored while `%APPDATA%\Pickets` remains.
 - [ ] Verify the first-run readiness checks, desktop-shortcut option, launch-at-login option, and
       tray-menu quick start guide.
 - [ ] Windows 10 version 1809 or newer smoke test.
@@ -39,7 +43,7 @@
 
 - [ ] If signing is configured, verify the Authenticode signature and timestamp.
 - [ ] Create and push an annotated tag matching the project version, for example `v1.0.0`.
-- [ ] Confirm the release workflow attaches `Pickets.exe` and `SHA256SUMS.txt`.
+- [ ] Confirm the release workflow attaches `PicketsSetup.exe`, `Pickets.exe`, and `SHA256SUMS.txt`.
 - [ ] Verify the GitHub build-provenance attestation.
 - [ ] Download the public asset on a clean machine and confirm its SHA-256 checksum.
 - [ ] Review generated release notes before announcing the release.
