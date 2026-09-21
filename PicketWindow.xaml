@@ -7,7 +7,7 @@
         Background="Transparent"
         ShowInTaskbar="False"
         ResizeMode="NoResize"
-        MinWidth="160" MinHeight="40"
+        MinWidth="160" MinHeight="32"
         Title="Picket"
         UseLayoutRounding="True">
     <Window.Resources>
@@ -351,14 +351,17 @@
         <Thumb x:Name="ResizeRight"
                HorizontalAlignment="Right" VerticalAlignment="Stretch"
                Width="6" Cursor="SizeWE" Opacity="0"
+               DragStarted="Resize_DragStarted" DragCompleted="Resize_DragCompleted"
                DragDelta="ResizeRight_DragDelta"/>
         <Thumb x:Name="ResizeBottom"
                HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
                Height="6" Cursor="SizeNS" Opacity="0"
+               DragStarted="Resize_DragStarted" DragCompleted="Resize_DragCompleted"
                DragDelta="ResizeBottom_DragDelta"/>
         <Thumb x:Name="ResizeBottomRight"
                HorizontalAlignment="Right" VerticalAlignment="Bottom"
                Width="14" Height="14" Cursor="SizeNWSE" Opacity="0"
+               DragStarted="Resize_DragStarted" DragCompleted="Resize_DragCompleted"
                DragDelta="ResizeBottomRight_DragDelta"/>
     </Grid>
 </Window>

@@ -11,6 +11,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace Pickets;
 
@@ -31,6 +32,8 @@ public partial class PicketWindow : Window
     private bool _isLoading;
     private bool _isCollapsed;
     private double _expandedHeight;
+    private bool _isRollAnimating;
+    private DispatcherTimer? _rollAnimationTimer;
     private string _colorKey = "stone";
     private string _transparencyKey = "solid";
     private int _transparencyCustomPercent = 50;
@@ -640,15 +643,30 @@ public partial class PicketWindow : Window
     private void TitleEditBox_LostFocus(object sender, RoutedEventArgs e) => CommitRename();
 
     // === Roll-up ===
-    private void ToggleCollapse() => ApplyCollapseState(!_isCollapsed);
+    private const double CollapsedHeight = 32;
+    private static readonly TimeSpan RollAnimationDuration = TimeSpan.FromMilliseconds(220);
 
-    private void ApplyCollapseState(bool collapsed)
+    private void ToggleCollapse()
     {
+        if (_isRollAnimating) return;
+        ApplyCollapseState(!_isCollapsed, animate: true);
+    }
+
+    private void ApplyCollapseState(bool collapsed, bool animate = false)
+    {
+        if (collapsed == _isCollapsed || _isRollAnimating) return;
+
+        if (animate)
+        {
+            AnimateCollapseState(collapsed);
+            return;
+        }
+
         if (collapsed)
         {
             if (!_isCollapsed) _expandedHeight = Height;
             BodyScroll.Visibility = Visibility.Collapsed;
-            Height = 32;
+            Height = CollapsedHeight;
             _isCollapsed = true;
         }
         else
@@ -660,11 +678,167 @@ public partial class PicketWindow : Window
         RaiseLayoutChanged();
     }
 
+    /// <summary>
+    /// Rolls this picket open/closed while keeping the title bars beneath it attached to its bottom
+    /// edge. Previously only this window changed height, so its body covered the rest of a stacked
+    /// group. The whole transition is driven together so no overlap appears between animation frames.
+    /// </summary>
+    private void AnimateCollapseState(bool collapsed)
+    {
+        var cluster = ComputeTouchingCluster();
+        var startHeight = Height;
+        if (collapsed) _expandedHeight = startHeight;
+
+        var targetHeight = collapsed ? CollapsedHeight : Math.Max(CollapsedHeight, _expandedHeight);
+        var followers = cluster
+            .Where(p => p != this && p.Top > Top + 1 && HorizontallyOverlaps(p, this))
+            .ToHashSet();
+
+        // Layouts saved by older builds may already have the collapsed tabs underneath an expanded
+        // body. On their first close those tabs are already in the right compact positions, so do
+        // not pull them upward a second time. Newly flowed stacks sit at this window's bottom edge.
+        var followersAlreadyFlowed = followers.Count == 0 ||
+            followers.Min(p => p.Top) >= Top + startHeight - GROUP_GAP;
+
+        // If the opened stack would run past the taskbar, first use any free space above it. If the
+        // complete stack is taller than the monitor, cap only the opened body; every title remains
+        // reachable and the preferred expanded height is retained for a roomier monitor/layout.
+        var delta = targetHeight - startHeight;
+        var followerDelta = collapsed && !followersAlreadyFlowed ? 0 : delta;
+        if (!collapsed && TryGetWorkAreaVertical(out var workTop, out var workBottom))
+        {
+            var minTop = cluster.Min(p => p.Top);
+            var maxBottom = cluster.Max(p =>
+                p.Top + (followers.Contains(p) ? followerDelta : 0) + (p == this ? targetHeight : p.Height));
+            var excess = Math.Max(0, (maxBottom - minTop) - (workBottom - workTop));
+            if (excess > 0)
+            {
+                targetHeight = Math.Max(CollapsedHeight, targetHeight - excess);
+                delta = targetHeight - startHeight;
+                followerDelta = delta;
+            }
+        }
+
+        var startTops = cluster.ToDictionary(p => p, p => p.Top);
+        var targetTops = cluster.ToDictionary(
+            p => p,
+            p => p.Top + (followers.Contains(p) ? followerDelta : 0));
+
+        if (TryGetWorkAreaVertical(out var visibleTop, out var visibleBottom))
+        {
+            var finalMinTop = targetTops.Values.Min();
+            var finalMaxBottom = cluster.Max(p =>
+                targetTops[p] + (p == this ? targetHeight : p.Height));
+            var groupShift = finalMaxBottom > visibleBottom
+                ? visibleBottom - finalMaxBottom
+                : finalMinTop < visibleTop
+                    ? visibleTop - finalMinTop
+                    : 0;
+
+            if (groupShift != 0)
+                foreach (var p in cluster) targetTops[p] += groupShift;
+        }
+
+        foreach (var p in cluster) p._isRollAnimating = true;
+        if (!collapsed)
+        {
+            _isCollapsed = false;
+            BodyScroll.Visibility = Visibility.Visible;
+        }
+
+        var clock = Stopwatch.StartNew();
+        _rollAnimationTimer = new DispatcherTimer(DispatcherPriority.Render)
+        {
+            Interval = TimeSpan.FromMilliseconds(16),
+        };
+        _rollAnimationTimer.Tick += (_, _) =>
+        {
+            var progress = Math.Clamp(clock.Elapsed.TotalMilliseconds /
+                                      RollAnimationDuration.TotalMilliseconds, 0, 1);
+            // Cubic ease-in/out gives the expansion a soft start and a decisive, non-bouncy finish.
+            var eased = progress < 0.5
+                ? 4 * progress * progress * progress
+                : 1 - Math.Pow(-2 * progress + 2, 3) / 2;
+
+            Height = startHeight + (targetHeight - startHeight) * eased;
+            foreach (var p in cluster)
+                p.Top = startTops[p] + (targetTops[p] - startTops[p]) * eased;
+
+            if (progress < 1) return;
+
+            _rollAnimationTimer.Stop();
+            _rollAnimationTimer = null;
+            Height = targetHeight;
+            foreach (var p in cluster)
+            {
+                p.Top = targetTops[p];
+                p._isRollAnimating = false;
+            }
+
+            if (collapsed)
+            {
+                BodyScroll.Visibility = Visibility.Collapsed;
+                _isCollapsed = true;
+            }
+            RaiseLayoutChanged();
+        };
+        _rollAnimationTimer.Start();
+    }
+
+    private static bool HorizontallyOverlaps(PicketWindow a, PicketWindow b)
+        => a.Left < b.Left + b.Width && b.Left < a.Left + a.Width;
+
+    private bool TryGetWorkAreaVertical(out double top, out double bottom)
+    {
+        top = bottom = 0;
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero || !WindowInterop.GetWindowRect(hwnd, out var rect)) return false;
+
+        var monitor = WindowInterop.MonitorFromRect(ref rect, WindowInterop.MONITOR_DEFAULTTONEAREST);
+        var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+        if (!WindowInterop.GetMonitorInfo(monitor, ref info)) return false;
+
+        // PointFromScreen performs the physical-pixel to WPF-DIP conversion for this monitor.
+        var localTop = PointFromScreen(new Point(info.rcWork.left, info.rcWork.top));
+        var localBottom = PointFromScreen(new Point(info.rcWork.right, info.rcWork.bottom));
+        top = Top + localTop.Y;
+        bottom = Top + localBottom.Y;
+        return bottom > top;
+    }
+
     // === Resize thumbs ===
+    // When this picket is part of a connected group, resizing matches every grouped picket to the
+    // size you drag: all adopt the new width on a right-edge drag, the new height on a bottom drag.
+    // The group is captured once at drag-start so membership stays stable for the whole gesture.
+    private List<PicketWindow>? _resizeCluster;
+
+    private void Resize_DragStarted(object sender, DragStartedEventArgs e)
+        => _resizeCluster = ComputeTouchingCluster();
+
+    private void Resize_DragCompleted(object sender, DragCompletedEventArgs e)
+        => _resizeCluster = null;
+
+    private void MatchClusterWidth()
+    {
+        if (_resizeCluster == null) return;
+        foreach (var p in _resizeCluster)
+            if (p != this) p.Width = Width;
+    }
+
+    private void MatchClusterHeight()
+    {
+        if (_resizeCluster == null) return;
+        // Skip collapsed members -- forcing a rolled-up picket to a tall height would leave it in a
+        // half-collapsed state (title bar stretched, body still hidden).
+        foreach (var p in _resizeCluster)
+            if (p != this && !p._isCollapsed) p.Height = Height;
+    }
+
     private void ResizeRight_DragDelta(object sender, DragDeltaEventArgs e)
     {
         var newW = Width + e.HorizontalChange;
         if (newW >= MinWidth) Width = newW;
+        MatchClusterWidth();
     }
 
     private void ResizeBottom_DragDelta(object sender, DragDeltaEventArgs e)
@@ -672,15 +846,18 @@ public partial class PicketWindow : Window
         if (_isCollapsed) return;
         var newH = Height + e.VerticalChange;
         if (newH >= MinHeight) Height = newH;
+        MatchClusterHeight();
     }
 
     private void ResizeBottomRight_DragDelta(object sender, DragDeltaEventArgs e)
     {
         var newW = Width + e.HorizontalChange;
         if (newW >= MinWidth) Width = newW;
+        MatchClusterWidth();
         if (_isCollapsed) return;
         var newH = Height + e.VerticalChange;
         if (newH >= MinHeight) Height = newH;
+        MatchClusterHeight();
     }
 
     // === Drag-drop into the picket body ===
