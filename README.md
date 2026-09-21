@@ -13,18 +13,28 @@ inside movable, translucent groups that stay at the wallpaper layer of your desk
 
 ## Install and first run
 
+### Choose a download
+
+| Download | Best for | What it changes |
+| --- | --- | --- |
+| `PicketsSetup.exe` (recommended) | Most people | Installs Pickets for your Windows account, adds a Start menu shortcut, and offers clearly labeled desktop-shortcut and launch-at-login choices |
+| `Pickets.exe` (portable) | USB drives, testing, or a fully manual setup | Runs from its current folder and installs nothing automatically |
+
 ### Recommended: guided installer
 
 1. Download `PicketsSetup.exe` from
    [GitHub Releases](https://github.com/Creeptones/Pickets/releases).
-2. Review the setup summary and destination. The default is
-   `%LOCALAPPDATA%\Programs\Pickets`, and **Browse** lets you choose another folder.
-3. Choose whether to create a desktop shortcut and whether Pickets should start when you sign in.
-   The shortcut is selected by default; launch-at-login is opt-in.
-4. Select **Install**, then use the short first-run guide to check the two required desktop settings.
+2. Review the license and the plain-language **What setup changes** page.
+3. Confirm the install folder. The recommended default is
+   `%LOCALAPPDATA%\Programs\Pickets`; select **Browse** if you prefer another location.
+4. Choose whether to create a desktop shortcut and start Pickets when you sign in. The desktop
+   shortcut is selected by default; launch at login is off until you opt in.
+5. Select **Install**, then leave **Launch Pickets** selected to open the short first-run guide.
 
-Setup is per-user and does not request administrator access. It installs one self-contained
-executable plus the shortcuts you select—no service, driver, account, network access, or telemetry.
+Setup is per-user and does not request administrator access. It copies one self-contained
+executable, adds a Start menu shortcut, and applies only the choices shown in the wizard. It does
+not install a service or driver, change Windows desktop settings, create an account, access the
+network, or add telemetry.
 
 ### Portable option
 
@@ -36,9 +46,41 @@ executable plus the shortcuts you select—no service, driver, account, network 
 3. Run `Pickets.exe`. The short first-run guide checks the two required desktop settings and can
    create a desktop shortcut or start Pickets when you sign in.
 
+Keep the portable executable in its permanent folder before creating either shortcut. Moving it
+later leaves those shortcuts pointing to the old location.
+
+### Updating
+
+To update an installed copy, download and run the newer `PicketsSetup.exe`. Setup recognizes the
+existing installation, reuses its location, and replaces the application executable. Your layouts
+and appearance settings stay in `%APPDATA%\Pickets` and are not part of the installation folder.
+If Setup asks to close Pickets, allow it to do so and relaunch the app when the update finishes.
+
+For a portable copy, quit Pickets and replace the old `Pickets.exe` with the new one in the same
+folder.
+
+### Uninstalling
+
+Open **Windows Settings → Apps → Installed apps**, find **Pickets**, and choose **Uninstall**.
+Before removing the application, the uninstaller asks Pickets to restore every captured desktop
+icon. It then removes the executable, its Start menu and desktop shortcuts, and the launch-at-login
+entry created by Setup.
+
+Saved layouts and diagnostic logs remain in `%APPDATA%\Pickets`, making a later reinstall
+recoverable. After uninstalling, you may delete that folder manually if you also want to erase the
+saved layouts and logs.
+
+### Verifying a download
+
 Both downloads are currently unsigned. Windows SmartScreen may warn the first time either runs;
 choose **More info**, verify that the app is Pickets, and then choose **Run anyway**. Each release
 includes SHA-256 checksums and GitHub build-provenance attestations for both executables.
+
+To compare a download with its entry in the release's `SHA256SUMS.txt`:
+
+```powershell
+Get-FileHash .\PicketsSetup.exe -Algorithm SHA256
+```
 
 ## Before first use
 
@@ -128,12 +170,13 @@ recovery request is forwarded to that instance.
 - Emergency icon restoration independent of normal UI startup.
 - About window with version information, the data folder, and sanitized diagnostic copying.
 - Single-instance behavior and an always-accessible system tray.
+- Guided per-user installer and a standalone portable download.
 - Fully offline operation with no telemetry or user account.
 
 ## Requirements
 
 - Windows 10 version 1809 or newer, or Windows 11.
-- Windows x64 for the downloadable portable build.
+- Windows x64 for the downloadable installer and portable build.
 - **Auto arrange icons** and **Align icons to grid** disabled.
 
 The .NET 10 SDK is needed only when building from source.
@@ -159,12 +202,23 @@ The result is written to:
 bin\Release\net10.0-windows\win-x64\publish\Pickets.exe
 ```
 
+To build the installer locally, publish into its staging folder, install
+[Inno Setup 6](https://jrsoftware.org/isinfo.php), and run the included build script:
+
+```powershell
+dotnet publish Pickets.csproj --configuration Release --property:PublishProfile=win-x64 --output release\portable
+.\installer\build-installer.ps1 -Version 1.0.0
+```
+
+The installer is written to `release\PicketsSetup.exe`.
+
 Release builds enable the recommended .NET analyzers and treat warnings as errors. Pushes and pull
 requests are also compiled and publish-checked on Windows through GitHub Actions.
 
 Pushing a version tag that matches `Pickets.csproj` (for example, `v1.0.0`) runs the release
-workflow. It tests and publishes the app, creates `SHA256SUMS.txt`, records GitHub build provenance,
-and attaches both files to a GitHub Release.
+workflow. It tests and publishes the app, builds the per-user installer, creates
+`SHA256SUMS.txt`, records GitHub build provenance for both executables, and attaches the installer,
+portable executable, and checksums to a GitHub Release.
 
 ## Troubleshooting
 
@@ -177,6 +231,10 @@ left-click the Pickets tray icon. Launching Pickets again also surfaces the alre
 
 **Launch at login stopped working after moving the executable:** Open a picket's title menu and
 toggle **Launch at login** off and back on. This records the new portable executable path.
+
+**Setup says Pickets is still running:** Choose **Quit Pickets** from the tray menu, then continue
+Setup. Normal Quit restores the desktop icons while the app is closed; they are collected again
+when the updated app starts.
 
 **A layout does not load:** Check `%APPDATA%\Pickets\debug.log`. Pickets will try
 `layout.json.bak` automatically when the primary file is invalid or unreadable.
