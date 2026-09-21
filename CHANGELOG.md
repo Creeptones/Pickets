@@ -5,6 +5,16 @@ All notable changes to Pickets are documented here. Versions follow
 
 ## [Unreleased]
 
+### Added
+
+- A lighter first-run guide now checks required desktop settings, offers desktop-shortcut and
+  launch-at-login setup, and remains available from the tray menu.
+
+### Changed
+
+- Installation guidance now walks portable users through choosing a permanent location before
+  creating shortcuts or enabling launch at login.
+
 ### Fixed
 
 - Connected pickets now keep a single shared size, resize together from the group's outside

@@ -73,10 +73,13 @@ public partial class App : Application
             return;
         }
 
+        _layout = LayoutStore.Load();
         var autoArrange = DesktopIconHider.IsAutoArrangeOn();
         var snapToGrid = DesktopIconHider.IsSnapToGridOn();
 
-        if (autoArrange || snapToGrid)
+        // First launch explains these prerequisites in context and offers a live recheck. Returning
+        // users still get a concise warning if a Windows update or Explorer setting changed them.
+        if (_layout.HasCompletedOnboarding && (autoArrange || snapToGrid))
         {
             var problems = (autoArrange ? "\"Auto arrange icons\"" : "") +
                            (autoArrange && snapToGrid ? " and " : "") +
@@ -88,7 +91,6 @@ public partial class App : Application
                 "Pickets", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
-        _layout = LayoutStore.Load();
         _activeProfile = DisplayProfile.CurrentKey();
         Logger.Log($"Active display profile: {_activeProfile}");
         LoadActiveProfile();
@@ -143,6 +145,7 @@ public partial class App : Application
         _tray = new TrayIcon(
             onToggleVisibility: ToggleAllPicketsVisibility,
             onNewPicket:         () => CreatePicket(300, 200),
+            onShowWelcome:       ShowWelcome,
             onReleaseAndQuit:    ReleaseAllCapturedIconsAndQuit,
             onQuit:              QuitAndRestoreIcons,
             onExitHidden:        Shutdown,
@@ -176,9 +179,24 @@ public partial class App : Application
 
     private void ShowWelcome()
     {
-        new WelcomeWindow().ShowDialog();
+        var firstRun = !_layout.HasCompletedOnboarding;
+        var welcome = new WelcomeWindow(DesktopShortcut.Exists, StartupEntry.IsEnabled);
+        if (welcome.ShowDialog() != true) return;
+
+        if (welcome.CreateDesktopShortcut && !DesktopShortcut.TryCreate(out var shortcutError))
+        {
+            MessageBox.Show($"Pickets could not create the desktop shortcut.\n\n{shortcutError}",
+                "Pickets", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        if (welcome.RunAtLogin) StartupEntry.Enable();
+        else                    StartupEntry.Disable();
+
         _layout.HasCompletedOnboarding = true;
         SaveLayout();
+        if (firstRun)
+            _tray?.ShowBalloon("Pickets is ready",
+                "Drag in an icon to begin. Reopen the quick start guide from the tray anytime.");
     }
 
     /// <summary>Makes every picket visible and brings them forward -- the response to a second launch

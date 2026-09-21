@@ -11,11 +11,15 @@ inside movable, translucent groups that stay at the wallpaper layer of your desk
 - No installer required.
 - Your files stay where they are; Pickets manages their desktop presentation.
 
-## Download
+## Install and first run
 
-Download the latest portable `Pickets.exe` from
-[GitHub Releases](https://github.com/Creeptones/Pickets/releases). It is a self-contained Windows
-x64 executable, so the .NET runtime does not need to be installed separately.
+1. Download the latest portable `Pickets.exe` from
+   [GitHub Releases](https://github.com/Creeptones/Pickets/releases).
+2. Move it out of Downloads into a permanent folder, such as
+   `%LOCALAPPDATA%\Programs\Pickets`. Pickets is self-contained, so no .NET installation or
+   administrator access is required.
+3. Run `Pickets.exe`. The short first-run guide checks the two required desktop settings and can
+   create a desktop shortcut or start Pickets when you sign in.
 
 Pickets is currently unsigned. Windows SmartScreen may warn the first time it runs; choose
 **More info**, verify that the app is Pickets, and then choose **Run anyway**.
@@ -28,7 +32,9 @@ off both:
 - **Auto arrange icons**
 - **Align icons to grid**
 
-The app checks these settings at startup and warns when either one is enabled.
+The first-run guide shows the live status of both settings and includes a **Check again** button.
+If either setting changes later, Pickets warns at startup. You can reopen the guide from the tray
+menu at any time.
 
 ## Using Pickets
 

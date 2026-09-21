@@ -20,6 +20,7 @@ public sealed class TrayIcon : IDisposable
     public TrayIcon(
         Action onToggleVisibility,
         Action onNewPicket,
+        Action onShowWelcome,
         Action onReleaseAndQuit,
         Action onQuit,
         Action onExitHidden,
@@ -31,6 +32,7 @@ public sealed class TrayIcon : IDisposable
 
         menu.Items.Add(new ToolStripMenuItem("Show / hide pickets", null, (_, _) => onToggleVisibility()));
         menu.Items.Add(new ToolStripMenuItem("New picket", null, (_, _) => onNewPicket()));
+        menu.Items.Add(new ToolStripMenuItem("Quick start guide...", null, (_, _) => onShowWelcome()));
         menu.Items.Add(new ToolStripSeparator());
 
         // "&&" renders as a literal ampersand (a single "&" would become a mnemonic underline).

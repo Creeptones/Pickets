@@ -17,6 +17,8 @@
 ## Windows interaction matrix
 
 - [ ] Clean first launch on Windows 11 as a standard user.
+- [ ] Verify the first-run readiness checks, desktop-shortcut option, launch-at-login option, and
+      tray-menu quick start guide.
 - [ ] Windows 10 version 1809 or newer smoke test.
 - [ ] 100%, 125%, 150%, and 200% display scaling.
 - [ ] Mixed-DPI multi-monitor arrangement.
@@ -27,7 +29,7 @@
 - [ ] Drag a non-desktop file into and back out of a picket.
 - [ ] Exercise lasso creation, roll-up stacks, group movement, resizing, and unlinking.
 - [ ] Verify missing/renamed items and **Clean up missing items**.
-- [ ] Verify legacy layout and former folder-portal migration.
+- [ ] Verify former folder portals still load as ordinary folder shortcuts.
 - [ ] Verify normal Quit restores icons and a later launch collects them again.
 - [ ] Verify **Exit and keep icons hidden** behaves as labeled.
 - [ ] Verify `Pickets.exe --restore-icons` both with and without Pickets already running.
