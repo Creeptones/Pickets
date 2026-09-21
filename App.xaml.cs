@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Interop;
@@ -30,6 +31,7 @@ public partial class App : Application
 
     private SingleInstance? _singleInstance;
     private bool _isSecondaryInstance;
+    private bool _isRecoveryMode;
     private TrayIcon? _tray;
     private ExplorerRestartWatcher? _explorerWatcher;
     // Explorer fires TaskbarCreated as soon as its shell window exists, but the WorkerW we re-parent
@@ -44,6 +46,8 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        var recoveryRequested = e.Args.Any(arg =>
+            arg.Equals("--restore-icons", StringComparison.OrdinalIgnoreCase));
 
         // Single-instance guard FIRST -- before any desktop manipulation. A second launch must not
         // re-hide icons or re-fire the WorkerW spawn (which previously dragged the live desktop
@@ -51,7 +55,8 @@ public partial class App : Application
         _singleInstance = new SingleInstance();
         if (!_singleInstance.IsFirstInstance)
         {
-            SingleInstance.SignalExistingInstance();
+            if (recoveryRequested) SingleInstance.SignalRestoreRequest();
+            else                   SingleInstance.SignalExistingInstance();
             _isSecondaryInstance = true;
             Shutdown();
             return;
@@ -65,6 +70,12 @@ public partial class App : Application
         LegacyMigration.Run();
 
         InstallCrashHandlers();
+
+        if (recoveryRequested)
+        {
+            RunEmergencyRecovery();
+            return;
+        }
 
         var autoArrange = DesktopIconHider.IsAutoArrangeOn();
         var snapToGrid = DesktopIconHider.IsSnapToGridOn();
@@ -136,14 +147,18 @@ public partial class App : Application
         _tray = new TrayIcon(
             onToggleVisibility: ToggleAllPicketsVisibility,
             onNewPicket:         () => CreatePicket(300, 200),
-            onRestoreAndQuit:   RestoreAllAndQuit,
-            onQuit:             Shutdown,
+            onReleaseAndQuit:    ReleaseAllCapturedIconsAndQuit,
+            onQuit:              QuitAndRestoreIcons,
+            onExitHidden:        Shutdown,
+            onAbout:             ShowAbout,
             getRunAtLogin:      () => StartupEntry.IsEnabled,
             setRunAtLogin:      enabled => { if (enabled) StartupEntry.Enable(); else StartupEntry.Disable(); });
 
         // A later launch (or our own SignalExistingInstance) asks us to surface the pickets. The
         // callback arrives on a thread-pool thread, so hop to the UI thread before touching windows.
-        _singleInstance.ListenForShowRequests(() => Dispatcher.BeginInvoke(SurfaceAllPickets));
+        _singleInstance.ListenForRequests(
+            () => Dispatcher.BeginInvoke(SurfaceAllPickets),
+            () => Dispatcher.BeginInvoke(() => ReleaseAllCapturedIconsAndQuit(confirm: false)));
 
         // Re-attach pickets to the new WorkerW whenever Explorer restarts, so they never get orphaned.
         _explorerRestartDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(750) };
@@ -158,6 +173,16 @@ public partial class App : Application
             _explorerRestartDebounce?.Stop();
             _explorerRestartDebounce?.Start();
         });
+
+        if (!_layout.HasCompletedOnboarding)
+            Dispatcher.BeginInvoke(ShowWelcome);
+    }
+
+    private void ShowWelcome()
+    {
+        new WelcomeWindow().ShowDialog();
+        _layout.HasCompletedOnboarding = true;
+        SaveLayout();
     }
 
     /// <summary>Makes every picket visible and brings them forward -- the response to a second launch
@@ -360,7 +385,7 @@ public partial class App : Application
         // A secondary instance set up none of the subsystems below and -- crucially -- must NOT
         // SaveLayout(), or it would persist its empty picket list over the real layout. Just release
         // its mutex handle and leave.
-        if (_isSecondaryInstance)
+        if (_isSecondaryInstance || _isRecoveryMode)
         {
             _singleInstance?.Dispose();
             base.OnExit(e);
@@ -505,12 +530,13 @@ public partial class App : Application
         LayoutStore.Save(_layout);
     }
 
-    /// <summary>Restores every captured icon to its original desktop position, then quits.</summary>
-    public void RestoreAllAndQuit()
+    /// <summary>Normal quit: leave the saved ownership metadata intact, but make desktop icons
+    /// visible while Pickets is not running. A later launch collects them again.</summary>
+    public void QuitAndRestoreIcons()
     {
         var result = MessageBox.Show(
             "Restore all hidden desktop icons and quit Pickets?\n\n" +
-            "Your picket layout will still be saved -- icons will be hidden again next launch.",
+            "Your layout stays saved and Pickets will collect the icons again next launch.",
             "Pickets", MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (result != MessageBoxResult.OK) return;
 
@@ -518,16 +544,101 @@ public partial class App : Application
         // straight back off-screen.
         _rehideTimer?.Stop();
 
-        foreach (var picket in _pickets)
+        var captured = _pickets.SelectMany(picket => picket.Items)
+            .Where(item => item.OriginalDesktopPos.HasValue && !item.IsMissing)
+            .GroupBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new CapturedDesktopIcon(
+                group.Key, group.First().OriginalDesktopPos!.Value))
+            .ToList();
+        var restored = RestoreCapturedIcons(captured);
+        if (restored.Count != captured.Count)
         {
-            foreach (var item in picket.Items)
+            var quitAnyway = MessageBox.Show(
+                $"Windows restored {restored.Count} of {captured.Count} captured icon(s).\n\n" +
+                "Some icons remain hidden. Quit anyway? Choose No to keep Pickets running and retry.",
+                "Pickets", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (quitAnyway != MessageBoxResult.Yes)
             {
-                if (item.OriginalDesktopPos.HasValue)
-                    DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value);
+                _rehideTimer?.Start();
+                return;
             }
         }
 
         SaveLayout();
         Shutdown();
     }
+
+    /// <summary>Permanently releases icon ownership in every display profile before quitting.
+    /// Picket shortcuts remain, but future launches will not hide their desktop icons.</summary>
+    public void ReleaseAllCapturedIconsAndQuit() => ReleaseAllCapturedIconsAndQuit(confirm: true);
+
+    private void ReleaseAllCapturedIconsAndQuit(bool confirm)
+    {
+        if (confirm)
+        {
+            var result = MessageBox.Show(
+                "Release every captured icon back to the desktop and quit?\n\n" +
+                "Picket shortcuts will remain, but future launches will no longer hide those " +
+                "desktop icons.",
+                "Pickets", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+            if (result != MessageBoxResult.OK) return;
+        }
+
+        _rehideTimer?.Stop();
+        SaveLayout();
+        var captured = IconCaptureRecovery.Collect(_layout, _activeProfile);
+        var restored = RestoreCapturedIcons(captured);
+        IconCaptureRecovery.Release(_layout, restored);
+        var restoredSet = restored.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in _pickets.SelectMany(picket => picket.Items))
+            if (restoredSet.Contains(item.Path)) item.OriginalDesktopPos = null;
+        SaveLayout();
+
+        if (confirm)
+            MessageBox.Show(
+                $"Released {restored.Count} of {captured.Count} captured desktop icon(s)." +
+                (restored.Count == captured.Count
+                    ? ""
+                    : "\n\nIcons Windows could not restore remain captured so recovery can retry later."),
+                "Pickets", MessageBoxButton.OK,
+                restored.Count == captured.Count ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        Shutdown();
+    }
+
+    private void RunEmergencyRecovery()
+    {
+        _isRecoveryMode = true;
+        _layout = LayoutStore.Load();
+        _activeProfile = DisplayProfile.CurrentKey();
+        var captured = IconCaptureRecovery.Collect(_layout, _activeProfile);
+        var restored = RestoreCapturedIcons(captured);
+        IconCaptureRecovery.Release(_layout, restored);
+        LayoutStore.Save(_layout);
+        Logger.Log($"Emergency recovery released {restored.Count} of {captured.Count} captured icon(s).");
+
+        MessageBox.Show(
+            $"Emergency recovery restored {restored.Count} of {captured.Count} captured desktop icon(s).\n\n" +
+            (restored.Count == captured.Count
+                ? "Pickets will no longer hide those icons on future launches."
+                : "Icons Windows could not restore remain captured so you can retry recovery later."),
+            "Pickets recovery", MessageBoxButton.OK,
+            restored.Count == captured.Count ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        Shutdown();
+    }
+
+    private static List<string> RestoreCapturedIcons(IEnumerable<CapturedDesktopIcon> captured)
+    {
+        var restored = new List<string>();
+        foreach (var icon in captured)
+        {
+            // There is no desktop icon left to unhide when its backing item was deleted. Treat it
+            // as released so stale capture metadata cannot make emergency recovery fail forever.
+            if ((!File.Exists(icon.Path) && !Directory.Exists(icon.Path)) ||
+                DesktopIconHider.Restore(icon.Path, icon.OriginalPosition))
+                restored.Add(icon.Path);
+        }
+        return restored;
+    }
+
+    public static void ShowAbout() => new AboutWindow().ShowDialog();
 }

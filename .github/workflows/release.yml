@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Verify tag matches project version
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content Pickets.csproj
+          $version = [string]$project.Project.PropertyGroup.Version
+          $tagVersion = $env:GITHUB_REF_NAME.TrimStart('v')
+          if ($tagVersion -ne $version) {
+            throw "Tag version '$tagVersion' does not match project version '$version'."
+          }
+
+      - name: Test
+        run: dotnet test Pickets.Tests/Pickets.Tests.csproj --configuration Release
+
+      - name: Publish portable executable
+        run: dotnet publish Pickets.csproj --configuration Release --property:PublishProfile=win-x64 --output release
+
+      - name: Generate SHA-256 checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash release/Pickets.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Pickets.exe" | Set-Content release/SHA256SUMS.txt -Encoding ascii
+
+      - name: Attest build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: release/Pickets.exe
+
+      - name: Preserve workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pickets-${{ github.ref_name }}-win-x64
+          path: |
+            release/Pickets.exe
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            release/Pickets.exe `
+            release/SHA256SUMS.txt `
+            --verify-tag `
+            --generate-notes `
+            --title "Pickets $env:GITHUB_REF_NAME"

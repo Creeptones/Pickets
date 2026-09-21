@@ -14,10 +14,13 @@ public sealed class SingleInstance : IDisposable
     // Versioned names so a future incompatible change can coexist with an old build mid-upgrade.
     private const string MutexName     = "Pickets.SingleInstance.v1";
     private const string ShowEventName = "Pickets.ShowRequest.v1";
+    private const string RestoreEventName = "Pickets.RestoreRequest.v1";
 
     private readonly Mutex _mutex;
     private EventWaitHandle? _showEvent;
-    private RegisteredWaitHandle? _registration;
+    private EventWaitHandle? _restoreEvent;
+    private RegisteredWaitHandle? _showRegistration;
+    private RegisteredWaitHandle? _restoreRegistration;
 
     /// <summary>True if this process is the first/owning instance. False means another is running.</summary>
     public bool IsFirstInstance { get; }
@@ -31,12 +34,19 @@ public sealed class SingleInstance : IDisposable
     /// <summary>First instance only: start listening for "surface yourself" pings from later launches.
     /// The callback fires on a thread-pool thread, so the supplied action must marshal to the UI
     /// thread itself.</summary>
-    public void ListenForShowRequests(Action onShowRequested)
+    public void ListenForRequests(Action onShowRequested, Action onRestoreRequested)
     {
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
-        _registration = ThreadPool.RegisterWaitForSingleObject(
+        _restoreEvent = new EventWaitHandle(false, EventResetMode.AutoReset, RestoreEventName);
+        _showRegistration = ThreadPool.RegisterWaitForSingleObject(
             _showEvent,
             (_, _) => onShowRequested(),
+            state: null,
+            millisecondsTimeOutInterval: Timeout.Infinite,
+            executeOnlyOnce: false);
+        _restoreRegistration = ThreadPool.RegisterWaitForSingleObject(
+            _restoreEvent,
+            (_, _) => onRestoreRequested(),
             state: null,
             millisecondsTimeOutInterval: Timeout.Infinite,
             executeOnlyOnce: false);
@@ -45,10 +55,16 @@ public sealed class SingleInstance : IDisposable
     /// <summary>Second instance: ping the original to surface itself. Best-effort -- if the event
     /// can't be opened (e.g. the first instance hasn't created it yet), we simply exit quietly.</summary>
     public static void SignalExistingInstance()
+        => Signal(ShowEventName);
+
+    public static void SignalRestoreRequest()
+        => Signal(RestoreEventName);
+
+    private static void Signal(string eventName)
     {
         try
         {
-            if (EventWaitHandle.TryOpenExisting(ShowEventName, out var ev))
+            if (EventWaitHandle.TryOpenExisting(eventName, out var ev))
             {
                 ev.Set();
                 ev.Dispose();
@@ -59,8 +75,10 @@ public sealed class SingleInstance : IDisposable
 
     public void Dispose()
     {
-        _registration?.Unregister(waitObject: null);
+        _showRegistration?.Unregister(waitObject: null);
+        _restoreRegistration?.Unregister(waitObject: null);
         _showEvent?.Dispose();
+        _restoreEvent?.Dispose();
         try { if (IsFirstInstance) _mutex.ReleaseMutex(); } catch { /* not owned / already released */ }
         _mutex.Dispose();
     }

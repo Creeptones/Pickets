@@ -20,8 +20,10 @@ public sealed class TrayIcon : IDisposable
     public TrayIcon(
         Action onToggleVisibility,
         Action onNewPicket,
-        Action onRestoreAndQuit,
+        Action onReleaseAndQuit,
         Action onQuit,
+        Action onExitHidden,
+        Action onAbout,
         Func<bool> getRunAtLogin,
         Action<bool> setRunAtLogin)
     {
@@ -35,10 +37,12 @@ public sealed class TrayIcon : IDisposable
         var runAtLogin = new ToolStripMenuItem("Run at login");
         runAtLogin.Click += (_, _) => setRunAtLogin(!runAtLogin.Checked);
         menu.Items.Add(runAtLogin);
+        menu.Items.Add(new ToolStripMenuItem("About Pickets...", null, (_, _) => onAbout()));
 
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("Restore icons && quit", null, (_, _) => onRestoreAndQuit()));
-        menu.Items.Add(new ToolStripMenuItem("Quit Pickets", null, (_, _) => onQuit()));
+        menu.Items.Add(new ToolStripMenuItem("Release all icons && quit...", null, (_, _) => onReleaseAndQuit()));
+        menu.Items.Add(new ToolStripMenuItem("Exit and keep icons hidden", null, (_, _) => onExitHidden()));
+        menu.Items.Add(new ToolStripMenuItem("Quit Pickets...", null, (_, _) => onQuit()));
 
         // Sync the checkmark to actual registry state every time the menu opens, so a change made
         // from a picket's title menu (or another tool) is always reflected.

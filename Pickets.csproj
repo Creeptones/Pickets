@@ -28,4 +28,10 @@
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/Creeptones/Pickets</RepositoryUrl>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Pickets.Tests\**\*.cs" />
+    <EmbeddedResource Remove="Pickets.Tests\**\*" />
+    <None Remove="Pickets.Tests\**\*" />
+  </ItemGroup>
 </Project>

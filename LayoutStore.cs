@@ -29,6 +29,9 @@ public class LayoutFile
 
     /// <summary>Theme inherited by newly created Pickets. Updated by the app-wide color action.</summary>
     public string DefaultColorKey { get; set; } = "porcelain";
+
+    /// <summary>Prevents the compact first-run guide from reappearing after it is acknowledged.</summary>
+    public bool HasCompletedOnboarding { get; set; }
 }
 
 /// <summary>A picket's visual style, kept global (shared by every display profile).</summary>
@@ -140,7 +143,7 @@ public static class LayoutStore
         }
     }
 
-    private static void Normalize(LayoutFile layout)
+    internal static void Normalize(LayoutFile layout)
     {
         layout.Profiles ??= new Dictionary<string, List<PicketState>>();
         layout.Appearances ??= new Dictionary<string, PicketAppearance>();
@@ -191,7 +194,7 @@ public static class LayoutStore
     /// display-profile string. Detect the version and migrate in memory so the user's existing
     /// layout.json keeps working. The migrated list is stored under "_legacy" and used as the
     /// seed for whichever profile is active on the first V2 launch.</summary>
-    private static LayoutFile? ParseWithMigration(string json)
+    internal static LayoutFile? ParseWithMigration(string json)
     {
         JsonNode? root;
         try { root = JsonNode.Parse(json); }

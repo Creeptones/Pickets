@@ -415,6 +415,25 @@ public partial class PicketWindow : Window
         if (UnlinkBtn == null) return;  // pre-XAML-init guard
         UnlinkBtn.Visibility = HasTouchingNeighbor() ? Visibility.Visible : Visibility.Collapsed;
         RefreshStackChrome();
+        RefreshResizeHandles();
+    }
+
+    /// <summary>Only expose resize handles on the outside of a connected group. Without this,
+    /// the transparent bottom thumb of an upper picket can be dragged through the title of the
+    /// picket below it, resizing several independent windows in place and making them overlap.</summary>
+    private void RefreshResizeHandles()
+    {
+        if (ResizeRight == null || ResizeBottom == null || ResizeBottomRight == null) return;
+
+        var cluster = ComputeTouchingCluster();
+        var groupRight = cluster.Max(p => p.Left + p.Width);
+        var groupBottom = cluster.Max(p => p.Top + p.Height);
+        var onRightEdge = Math.Abs(Left + Width - groupRight) <= GROUP_GAP;
+        var onBottomEdge = Math.Abs(Top + Height - groupBottom) <= GROUP_GAP;
+
+        ResizeRight.IsHitTestVisible = onRightEdge;
+        ResizeBottom.IsHitTestVisible = onBottomEdge && !_isCollapsed;
+        ResizeBottomRight.IsHitTestVisible = onRightEdge && onBottomEdge && !_isCollapsed;
     }
 
     /// <summary>Makes a vertical run of separate native windows read as one continuous component.
@@ -473,15 +492,22 @@ public partial class PicketWindow : Window
 
     private void TitleMenu_RestoreAll_Click(object sender, RoutedEventArgs e)
     {
-        if (Application.Current is App app) app.RestoreAllAndQuit();
+        if (Application.Current is App app) app.ReleaseAllCapturedIconsAndQuit();
     }
 
     private void TitleMenu_Quit_Click(object sender, RoutedEventArgs e)
     {
-        // Plain quit: layout auto-saves via the debounce timer and OnExit, and hidden desktop
-        // icons stay hidden (they'll reappear in their pickets on next launch). No confirmation --
-        // this is a reversible action since relaunching restores everything.
+        if (Application.Current is App app) app.QuitAndRestoreIcons();
+    }
+
+    private void TitleMenu_ExitHidden_Click(object sender, RoutedEventArgs e)
+    {
         if (Application.Current is App app) app.Shutdown();
+    }
+
+    private void TitleMenu_About_Click(object sender, RoutedEventArgs e)
+    {
+        App.ShowAbout();
     }
 
     private void TitleMenu_HideAll_Click(object sender, RoutedEventArgs e)
@@ -871,57 +897,62 @@ public partial class PicketWindow : Window
     }
 
     // === Resize thumbs ===
-    // When this picket is part of a connected group, resizing matches every grouped picket to the
-    // size you drag: all adopt the new width on a right-edge drag, the new height on a bottom drag.
-    // The group is captured once at drag-start so membership stays stable for the whole gesture.
-    private List<PicketWindow>? _resizeCluster;
+    // A connected cluster resizes as one virtual window. Only members that touch the dragged outer
+    // boundary change size: a vertical stack widens together but grows only at its bottom panel;
+    // a horizontal row grows taller together but widens only at its rightmost panel. The members
+    // are captured once at drag-start so membership stays stable for the whole gesture.
+    private List<PicketWindow>? _resizeRightEdge;
+    private List<PicketWindow>? _resizeBottomEdge;
 
     private void Resize_DragStarted(object sender, DragStartedEventArgs e)
-        => _resizeCluster = ComputeTouchingCluster();
-
-    private void Resize_DragCompleted(object sender, DragCompletedEventArgs e)
-        => _resizeCluster = null;
-
-    private void MatchClusterWidth()
     {
-        if (_resizeCluster == null) return;
-        foreach (var p in _resizeCluster)
-            if (p != this) p.Width = Width;
+        var cluster = ComputeTouchingCluster();
+        var groupRight = cluster.Max(p => p.Left + p.Width);
+        var groupBottom = cluster.Max(p => p.Top + p.Height);
+        _resizeRightEdge = cluster
+            .Where(p => Math.Abs(p.Left + p.Width - groupRight) <= GROUP_GAP)
+            .ToList();
+        _resizeBottomEdge = cluster
+            .Where(p => !p._isCollapsed && Math.Abs(p.Top + p.Height - groupBottom) <= GROUP_GAP)
+            .ToList();
     }
 
-    private void MatchClusterHeight()
+    private void Resize_DragCompleted(object sender, DragCompletedEventArgs e)
     {
-        if (_resizeCluster == null) return;
-        // Skip collapsed members -- forcing a rolled-up picket to a tall height would leave it in a
-        // half-collapsed state (title bar stretched, body still hidden).
-        foreach (var p in _resizeCluster)
-            if (p != this && !p._isCollapsed) p.Height = Height;
+        _resizeRightEdge = null;
+        _resizeBottomEdge = null;
+        if (Application.Current is App app)
+            foreach (var p in app.Pickets) p.RefreshLinkState();
+    }
+
+    private static void ResizeWidth(List<PicketWindow>? edge, double requestedChange)
+    {
+        if (edge == null || edge.Count == 0) return;
+        var change = Math.Max(requestedChange, edge.Max(p => p.MinWidth - p.Width));
+        foreach (var p in edge) p.Width += change;
+    }
+
+    private static void ResizeHeight(List<PicketWindow>? edge, double requestedChange)
+    {
+        if (edge == null || edge.Count == 0) return;
+        var change = Math.Max(requestedChange, edge.Max(p => p.MinHeight - p.Height));
+        foreach (var p in edge) p.Height += change;
     }
 
     private void ResizeRight_DragDelta(object sender, DragDeltaEventArgs e)
-    {
-        var newW = Width + e.HorizontalChange;
-        if (newW >= MinWidth) Width = newW;
-        MatchClusterWidth();
-    }
+        => ResizeWidth(_resizeRightEdge, e.HorizontalChange);
 
     private void ResizeBottom_DragDelta(object sender, DragDeltaEventArgs e)
     {
         if (_isCollapsed) return;
-        var newH = Height + e.VerticalChange;
-        if (newH >= MinHeight) Height = newH;
-        MatchClusterHeight();
+        ResizeHeight(_resizeBottomEdge, e.VerticalChange);
     }
 
     private void ResizeBottomRight_DragDelta(object sender, DragDeltaEventArgs e)
     {
-        var newW = Width + e.HorizontalChange;
-        if (newW >= MinWidth) Width = newW;
-        MatchClusterWidth();
+        ResizeWidth(_resizeRightEdge, e.HorizontalChange);
         if (_isCollapsed) return;
-        var newH = Height + e.VerticalChange;
-        if (newH >= MinHeight) Height = newH;
-        MatchClusterHeight();
+        ResizeHeight(_resizeBottomEdge, e.VerticalChange);
     }
 
     // === Drag-drop into the picket body ===

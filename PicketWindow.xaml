@@ -86,10 +86,13 @@
                 <MenuItem Header="Hide / show all pickets (Ctrl+Alt+D)" Click="TitleMenu_HideAll_Click"/>
                 <MenuItem Header="Launch at login" Tag="LaunchAtLogin" IsCheckable="True" Click="TitleMenu_ToggleLaunchAtLogin_Click"/>
                 <Separator/>
-                <MenuItem Header="Restore all icons and quit" Click="TitleMenu_RestoreAll_Click"/>
+                <MenuItem Header="About Pickets..." Click="TitleMenu_About_Click"/>
+                <Separator/>
+                <MenuItem Header="Release all icons and quit..." Click="TitleMenu_RestoreAll_Click"/>
+                <MenuItem Header="Exit and keep icons hidden" Click="TitleMenu_ExitHidden_Click"/>
             </MenuItem>
             <Separator/>
-            <MenuItem Header="Quit Pickets" Click="TitleMenu_Quit_Click"/>
+            <MenuItem Header="Quit Pickets..." Click="TitleMenu_Quit_Click"/>
         </ContextMenu>
 
         <!-- Tooltips need a solid background; default semi-transparent styling over a blurred picket

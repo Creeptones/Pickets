@@ -20,5 +20,7 @@ jobs:
         run: dotnet restore Pickets.csproj
       - name: Build release
         run: dotnet build Pickets.csproj --configuration Release --no-restore
+      - name: Test
+        run: dotnet test Pickets.Tests/Pickets.Tests.csproj --configuration Release
       - name: Verify portable package
         run: dotnet publish Pickets.csproj --configuration Release --property:PublishProfile=win-x64
