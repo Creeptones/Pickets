@@ -39,7 +39,33 @@
         </StackPanel>
 
         <StackPanel Grid.Row="1" Margin="0,24,0,0">
-            <TextBlock FontSize="16" FontWeight="SemiBold" Text="1   Ready your desktop"/>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock FontSize="16" FontWeight="SemiBold" Text="1   Ready your desktop"
+                           VerticalAlignment="Center"/>
+                <ToggleButton x:Name="DesktopHelpButton"
+                              Margin="8,0,0,0" Width="22" Height="22"
+                              Padding="0" Content="?" FontSize="13" FontWeight="Bold"
+                              Background="#FF24282E" Foreground="#FFD8E5EE"
+                              BorderBrush="#FF53616D" BorderThickness="1"
+                              Cursor="Hand" ToolTip="Why are these settings required?"
+                              AutomationProperties.Name="Why desktop settings are required"/>
+            </StackPanel>
+            <Popup IsOpen="{Binding IsChecked, ElementName=DesktopHelpButton, Mode=TwoWay}"
+                   PlacementTarget="{Binding ElementName=DesktopHelpButton}"
+                   Placement="Bottom" HorizontalOffset="6" VerticalOffset="4"
+                   AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False">
+                <Border Width="410" Padding="15" CornerRadius="7"
+                        Background="#FF24282E" BorderBrush="#FF53616D" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="Why Pickets needs this" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="#FFF4F5F7"/>
+                        <TextBlock Margin="0,7,0,0" TextWrapping="Wrap" Foreground="#FFD1D6DD"
+                                   Text="Pickets keeps your files in place. It remembers each captured desktop icon's exact position, hides that icon, and shows it inside a picket instead."/>
+                        <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#FFD1D6DD"
+                                   Text="Auto arrange and Align icons to grid let Windows reposition icons on its own. That can make captured icons reappear, jump, or lose their original spots. Turning both off lets Pickets restore everything exactly where it started."/>
+                    </StackPanel>
+                </Border>
+            </Popup>
             <TextBlock Margin="28,3,0,8" Foreground="#FFD1D6DD" TextWrapping="Wrap"
                        Text="Right-click the desktop, open View, and turn both options off. Pickets will check them for you."/>
             <Grid Margin="28,0,0,0">
