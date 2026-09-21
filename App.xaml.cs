@@ -65,10 +65,6 @@ public partial class App : Application
         Logger.StartSession();
         Logger.Log("=== App startup ===");
 
-        // Carry the user's layout + run-at-login across the DesktopFences -> Pickets rename. No-op
-        // once Pickets state exists. Must run before LayoutStore.Load() below.
-        LegacyMigration.Run();
-
         InstallCrashHandlers();
 
         if (recoveryRequested)
