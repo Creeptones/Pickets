@@ -16,6 +16,7 @@ public sealed class AccessibilityTests
     {
         protected override void OnStartup(StartupEventArgs e) { }
         protected override void OnExit(ExitEventArgs e) { }
+        protected override void PresentPicket(PicketWindow picket) { }
     }
 
     [Fact]
@@ -81,6 +82,16 @@ public sealed class AccessibilityTests
             Assert.Equal("Picket menu", AutomationProperties.GetName((Button)music.FindName("MenuButton")));
             Assert.Equal(280, music.ToState().Height);
             Capture(root, "pickets-standard.png", music.Width, music.Height);
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PICKETS_TEST_RENDER_DIR")))
+            {
+                foreach (var theme in PicketColors.All.Take(6))
+                {
+                    music.ApplyColorTheme(theme.Key);
+                    root.UpdateLayout();
+                    Capture(root, $"pickets-pastel-{theme.Key}.png", music.Width, music.Height);
+                }
+                music.ApplyColorTheme("porcelain");
+            }
             music.ApplyHighContrastVisuals();
             Assert.Same(SystemColors.WindowBrush, ((Border)music.FindName("OuterShell")).Background);
             Assert.Same(SystemColors.HighlightTextBrush, music.Resources["PicketSelectionForeground"]);
@@ -126,11 +137,24 @@ public sealed class AccessibilityTests
                 Assert.Single(windows[2].Items, i => i.Path == path);
             }
             finally { directory.Delete(true); }
+            var acrylic = new PicketWindow(new PicketState { Title = "Acrylic hit surface", BlurEnabled = true,
+                TransparencyKey = "medium", Width = 788, Height = 112, AutoSizeRows = false });
+            windows.Add(acrylic);
+            var acrylicRoot = (FrameworkElement)acrylic.Content;
+            LayoutAndCapture(acrylicRoot, "acrylic-hit-surface.png", 788, 112);
+            var acrylicBitmap = new RenderTargetBitmap(788, 112, 96, 96, PixelFormats.Pbgra32);
+            acrylicBitmap.Render(acrylicRoot);
+            var acrylicPixels = new byte[788 * 112 * 4];
+            acrylicBitmap.CopyPixels(acrylicPixels, 788 * 4, 0);
+            for (var y = 38; y < 106; y++)
+            for (var x = 10; x < 778; x++)
+                Assert.True(acrylicPixels[(y * 788 + x) * 4 + 3] > 0, $"Native click-through hole at {x},{y}.");
             CheckStackMembershipChanges(app, windows);
             CheckStackRetargeting(app, windows);
             CheckLabelBodyDropRouting(app, windows);
             CheckCompactRows(app, windows);
             CheckRectangleSelection(app, windows);
+            CheckQualityOfLife(app, windows);
             CheckReleasePolish(app, windows);
         }
         finally
@@ -139,6 +163,80 @@ public sealed class AccessibilityTests
             app.Frames.Dispose();
             // Do not call App.Shutdown: normal OnExit persists the user's real layout.
             Dispatcher.CurrentDispatcher.InvokeShutdown();
+        }
+    }
+
+    private static void CheckQualityOfLife(App app, List<PicketWindow> windows)
+    {
+        var source = new PicketWindow(new PicketState { Title = "Music archive", GroupId = "qol", GroupOrder = 0,
+            Width = 340, Height = 230, AutoSizeRows = false, IsCollapsed = true });
+        var target = new PicketWindow(new PicketState { Title = "Work", GroupId = "qol", GroupOrder = 1,
+            Width = 340, Height = 230, AutoSizeRows = false, IsCollapsed = true });
+        foreach (var p in new[] { source, target }) { windows.Add(p); ((IList<PicketWindow>)app.Pickets).Add(p); }
+        app.UndoHistory.Clear();
+        var first = new PicketItem { Path = @"Z:\fixture\mix.wav", DisplayName = "Mixdown" };
+        var second = new PicketItem { Path = @"Z:\fixture\demo.wav", DisplayName = "Demo" };
+        var label = PicketItem.CreateLabel("Albums");
+        source.Items.Add(first); source.Items.Add(label); source.Items.Add(second);
+        source.RemoveReferences([first, second]);
+        Assert.Single(source.Items);
+        Assert.True(app.UndoHistory.Undo());
+        Assert.Equal(new[] { first, label, second }, source.Items);
+        Assert.Null(app.UndoHistory.Description);
+        source.ReorderReference(0, 2);
+        Assert.Same(first, source.Items[2]);
+        Assert.True(app.UndoHistory.Undo());
+        Assert.Same(first, source.Items[0]);
+        first.OriginalDesktopPos = new POINT(20, 30);
+        Assert.Equal(2, source.TransferReferences([first, second], target).Length);
+        Assert.True(app.UndoHistory.Undo());
+        Assert.Equal(new[] { first, label, second }, source.Items);
+        Assert.Equal(20, first.OriginalDesktopPos!.Value.X);
+        Assert.Empty(target.Items);
+        first.OriginalDesktopPos = null;
+        var recovery = new PicketItem { Path = @"Z:\fixture\recover", DisplayName = "Recovery fixture" };
+        var removed = new[] { new PicketWindow.RemovedReference(recovery, 1, new POINT(71, 82)) };
+        Assert.False(source.RestoreReferences(removed, _ => null));
+        Assert.Contains(recovery, source.Items);
+        Assert.Null(recovery.OriginalDesktopPos);
+        Assert.True(source.RestoreReferences(removed, _ => new POINT(100, 110)));
+        Assert.Single(source.Items, item => item == recovery);
+        Assert.Equal(71, recovery.OriginalDesktopPos!.Value.X);
+        recovery.OriginalDesktopPos = null;
+        source.Items.Remove(recovery);
+        Assert.Same(first, Assert.Single(QuickFindWindow.Find([source, target], "MUSIC mix")).Item);
+        Assert.Same(label, Assert.Single(QuickFindWindow.Find([source, target], "albums")).Item);
+        Assert.Same(second, Assert.Single(QuickFindWindow.Find([source, target], "demo.wav")).Item);
+        Assert.Empty(QuickFindWindow.Find([source, target], "missing match"));
+        var search = new QuickFindWindow(app);
+        ((TextBox)search.FindName("Query")).Text = "archive mix";
+        Assert.Single(((ListBox)search.FindName("Results")).Items);
+        LayoutAndCapture((FrameworkElement)search.Content, "quick-find.png", 590, 370);
+        search.Close();
+        source.SetAutomaticHeight(true);
+        Assert.True(source.ToState().AutoSizeRows && target.ToState().AutoSizeRows);
+        source.SetAutomaticHeight(false);
+        Assert.False(source.ToState().AutoSizeRows || target.ToState().AutoSizeRows);
+
+        // Deleting and undoing a picket must preserve earlier item-level undo identities.
+        source.RemoveReferences([first]);
+        var id = source.PicketId;
+        app.DeletePicket(source);
+        windows.Remove(source);
+        Assert.DoesNotContain(app.Pickets, p => p.PicketId == id);
+        Assert.True(app.UndoHistory.Undo());
+        var restored = Assert.Single(app.Pickets, p => p.PicketId == id);
+        windows.Add(restored);
+        Assert.Equal(new[] { label, second }, restored.Items);
+        Assert.True(app.UndoHistory.Undo());
+        Assert.Equal(new[] { first, label, second }, restored.Items);
+        Assert.Equal(restored.Top + restored.Height, target.Top, 5);
+        app.UndoHistory.Clear();
+        foreach (var p in new[] { restored, target })
+        {
+            p.CloseForLayoutChange();
+            ((IList<PicketWindow>)app.Pickets).Remove(p);
+            windows.Remove(p);
         }
     }
 
@@ -176,6 +274,10 @@ public sealed class AccessibilityTests
             Capture((FrameworkElement)content, "pickets-rectangle-selection.png", 360, 225);
             window.EndBoxSelection();
             Assert.Equal(Visibility.Collapsed, ((FrameworkElement)window.FindName("SelectionBox")).Visibility);
+            Assert.Equal(Visibility.Visible, ((FrameworkElement)window.FindName("SelectionActions")).Visibility);
+            Assert.Equal("2 selected", ((TextBlock)window.FindName("SelectionCount")).Text);
+            host.UpdateLayout();
+            Capture((FrameworkElement)content, "selection-actions.png", 360, 225);
             Assert.Equal(2, window.ActionItems(window.Items[0]).Length);
             var selectedCell = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(0);
             var prepareMenu = typeof(PicketWindow).GetMethod("Item_ContextMenuOpening", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
@@ -290,6 +392,13 @@ public sealed class AccessibilityTests
                 Assert.True(seventh.TranslatePoint(new Point(0, 10), body).Y >= body.ActualHeight - 4,
                     "Third icon row should require scrolling.");
                 Assert.True(body.ScrollableHeight > 0);
+                var unselectedHeight = window.Height;
+                window.Items[0].IsSelected = window.Items[1].IsSelected = true;
+                SettleContent();
+                Assert.True(window.Height > unselectedHeight, "Selection actions should get their own space in automatic height mode.");
+                Assert.True(sixth.TranslatePoint(new Point(0, sixth.ActualHeight), body).Y <= body.ActualHeight - 3);
+                list.UnselectAll();
+                SettleContent();
                 Capture((FrameworkElement)content, $"compact-rows-{large}-{font}.png", width, window.Height);
                 var twoRows = window.ToState().Height;
                 while (window.Items.Count > 3) window.Items.RemoveAt(window.Items.Count - 1);
@@ -349,8 +458,94 @@ public sealed class AccessibilityTests
                 var hitPoint = body.TranslatePoint(bodyPoint, hit);
                 var args = (DragEventArgs)argsConstructor.Invoke([data, DragDropKeyStates.LeftMouseButton,
                     DragDropEffects.Copy | DragDropEffects.Move | DragDropEffects.Link, hit, hitPoint]);
+                Assert.True(hit.AllowDrop, $"Drop target {hit.GetType().Name} rejects input at {bodyPoint}.");
                 Assert.Equal(DragDropEffects.Link, (DragDropEffects)policy.Invoke(window, [args])!);
             }
+            // Exercise WPF's native OLE target, including its hit testing and event routing.
+            // This sends no mouse input and never attaches a window to Explorer.
+            host.AllowDrop = true;
+            foreach (var (routedEvent, methodName) in new[]
+            {
+                (System.Windows.DragDrop.PreviewDragEnterEvent, "Picket_DragOver"),
+                (System.Windows.DragDrop.PreviewDragOverEvent, "Picket_DragOver"),
+                (System.Windows.DragDrop.PreviewDragLeaveEvent, "Picket_DragLeave"),
+                (System.Windows.DragDrop.PreviewDropEvent, "Picket_PreviewDrop")
+            })
+            {
+                var method = typeof(PicketWindow).GetMethod(methodName, System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic)!;
+                host.AddHandler(routedEvent, new DragEventHandler((sender, args) => method.Invoke(window, [sender, args])));
+            }
+            var oleType = typeof(System.Windows.DragDrop).Assembly.GetType("System.Windows.OleDropTarget")!;
+            Assert.NotNull(oleType);
+            var ole = Activator.CreateInstance(oleType, System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic, null,
+                [new System.Windows.Interop.WindowInteropHelper(host).Handle], null)!;
+            var oleMethods = oleType.GetMethods(System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            var enter = oleMethods.Single(m => m.Name.EndsWith(".OleDragEnter", StringComparison.Ordinal));
+            var over = oleMethods.Single(m => m.Name.EndsWith(".OleDragOver", StringComparison.Ordinal));
+            var leave = oleMethods.Single(m => m.Name.EndsWith(".OleDragLeave", StringComparison.Ordinal));
+            long ScreenPoint(double x, double y)
+            {
+                var screen = body.PointToScreen(new Point(x, y));
+                return ((long)(int)screen.Y << 32) | (uint)(int)screen.X;
+            }
+            object[] enterArgs = [data, 1, ScreenPoint(15, 15), (int)(DragDropEffects.Copy | DragDropEffects.Move | DragDropEffects.Link)];
+            enter.Invoke(ole, enterArgs);
+            Assert.Equal((int)DragDropEffects.Link, enterArgs[3]);
+            foreach (var x in new[] { 15.0, 150.0, 400.0, 720.0 })
+            foreach (var y in new[] { 15.0, 35.0, body.ActualHeight - 15 })
+            {
+                object[] overArgs = [1, ScreenPoint(x, y), (int)(DragDropEffects.Copy | DragDropEffects.Move | DragDropEffects.Link)];
+                over.Invoke(ole, overArgs);
+                Assert.Equal((int)DragDropEffects.Link, overArgs[2]);
+            }
+            leave.Invoke(ole, null);
+            var source = new PicketWindow(new PicketState { Title = "Drag source", AutoSizeRows = false });
+            windows.Add(source);
+            ((IList<PicketWindow>)app.Pickets).Add(source);
+            var first = new PicketItem { Path = @"Z:\fixture\first", DisplayName = "First", OriginalDesktopPos = new POINT(44, 55) };
+            var second = new PicketItem { Path = @"Z:\fixture\second", DisplayName = "Second" };
+            source.Items.Add(first); source.Items.Add(second);
+            var payloadType = typeof(PicketWindow).GetNestedType("PicketItemDragPayload", System.Reflection.BindingFlags.NonPublic)!;
+            var payload = Activator.CreateInstance(payloadType, source, first)!;
+            payloadType.GetProperty("Items")!.SetValue(payload, new[] { first, second });
+            var batch = new DataObject();
+            batch.SetData("Pickets.PicketItemDrag", payload);
+            var batchArgs = (DragEventArgs)argsConstructor.Invoke([batch, DragDropKeyStates.LeftMouseButton,
+                DragDropEffects.Move, body, new Point(20, 20)]);
+            batchArgs.RoutedEvent = System.Windows.DragDrop.DropEvent;
+            Assert.Equal(DragDropEffects.Move, (DragDropEffects)policy.Invoke(window, [batchArgs])!);
+            var drop = typeof(PicketWindow).GetMethod("ItemsHost_Drop", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            var oleDrop = oleMethods.Single(m => m.Name.EndsWith(".OleDrop", StringComparison.Ordinal));
+            object[] batchEnter = [batch, 1, ScreenPoint(20, 20), (int)DragDropEffects.Move];
+            enter.Invoke(ole, batchEnter);
+            Assert.Equal((int)DragDropEffects.Move, batchEnter[3]);
+            object[] nativeDrop = [batch, 0, ScreenPoint(20, 20), (int)DragDropEffects.Move];
+            oleDrop.Invoke(ole, nativeDrop);
+            Assert.Equal((int)DragDropEffects.Move, nativeDrop[3]);
+            Assert.Equal(Visibility.Collapsed, ((Border)window.FindName("DropTargetOutline")).Visibility);
+            Assert.Empty(source.Items);
+            Assert.Contains(first, window.Items); Assert.Contains(second, window.Items);
+            Assert.Equal(DragDropEffects.None, (DragDropEffects)policy.Invoke(window, [batchArgs])!);
+            Assert.False(batch.GetDataPresent(DataFormats.FileDrop));
+            Assert.True(app.UndoHistory.Undo());
+            Assert.Equal(new[] { first, second }, source.Items);
+            Assert.Equal(44, first.OriginalDesktopPos!.Value.X);
+            var duplicate = new PicketItem { Path = first.Path, DisplayName = "Existing first" };
+            window.Items.Add(duplicate);
+            drop.Invoke(window, [body, batchArgs]);
+            Assert.Same(first, Assert.Single(source.Items));
+            Assert.Equal(44, first.OriginalDesktopPos!.Value.X);
+            Assert.Contains(second, window.Items);
+            Assert.True(app.UndoHistory.Undo());
+            Assert.Equal(new[] { first, second }, source.Items);
+            window.Items.Remove(duplicate);
+            first.OriginalDesktopPos = null;
+            source.CloseForLayoutChange();
+            ((IList<PicketWindow>)app.Pickets).Remove(source);
+            windows.Remove(source);
         }
         finally
         {

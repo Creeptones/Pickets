@@ -8,6 +8,10 @@ NOT TESTED; an unavailable machine or display configuration is not a pass.
 - [ ] Update `Version`, `AssemblyVersion`, and `FileVersion` in `Pickets.csproj`.
 - [ ] Move notable changes from **Unreleased** into the dated changelog entry.
 - [ ] Confirm the README describes the shipped controls and requirements.
+- [x] Add the user-approved desktop screenshot to the README (2026-09-22).
+- [ ] Verify the README download route, asset names, and unsigned-download guidance against the release.
+- [ ] Build the final installer and portable executable from the same approved commit; repeat the
+      smoke tests on those exact assets, including the latest QoL changes.
 - [ ] Confirm the working tree is clean and CI passes on `main`.
 - [ ] Confirm private vulnerability reporting is enabled and the security policy links to it.
 
@@ -167,3 +171,29 @@ The user passed rectangle-selecting two references and applying Large icon throu
 menu. All 130 automated tests passed, including real WPF selection, Shift/Ctrl modifiers, Escape
 cancellation, edge scrolling, bulk icon sizing, and transfers that preserve ownership and skip
 duplicates. The selection overlay render was inspected. Remaining live checks are in `TEST_RELEASE.md`.
+
+### Five QoL improvements (2026-09-22)
+
+Implemented session undo (30 actions), complete-selection drags with count previews and destination
+feedback, a selection action strip, Ctrl+F reference search, and automatic/manual height controls.
+Undo is reachable from the tray even when no pickets remain. Reference recapture failures keep the
+reference and a retryable undo operation. Bulk desktop restoration uses saved icon positions.
+133 tests passed, including ownership-preserving bulk drops/undo, deleted-picket restoration with
+earlier undo history, recapture failure/retry, search through collapsed pickets, and automatic height
+with the selection strip. Search, selection strip, and drag-count renders were inspected.
+Live interaction acceptance remains pending in `TEST_RELEASE.md`.
+
+### Drag-session and first-run follow-up (2026-09-22)
+
+The supplied recording shows some open bodies rejecting an external desktop shortcut while other
+sections accept it, with stale destination outlines. Disabling blur did not resolve the live issue.
+Hardened Shell drag-session identity and cleanup, released selection capture before internal drags,
+and completed valid drops during window preview routing. Isolated native WPF/OLE tests now cover
+body hit testing and routed transfers in addition to the reference-level checks. All 133 automated
+tests pass. The user passed the rebuilt candidate's live sequence: drag Astride across the open
+sections and cancel, transfer New folder from Creeptones to Ephemera History, then drag it to the
+desktop and back. No blocked bodies or lingering outlines were reported. The broader repeated
+collapse/reopen and release matrix remain required; this focused retest does not sign off those checks.
+The supplied screenshot is included unchanged, README links were checked, and the first-run guide
+now explains drop locations and safe removal/quit behavior. Normal and small/high-contrast dialog
+renders were inspected; the primary action remains reachable.

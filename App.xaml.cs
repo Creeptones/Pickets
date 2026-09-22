@@ -167,7 +167,8 @@ public partial class App : Application
             onExitHidden:        Shutdown,
             onAbout:             ShowAbout,
             getRunAtLogin:      () => StartupEntry.IsEnabled,
-            setRunAtLogin:      enabled => { if (enabled) StartupEntry.Enable(); else StartupEntry.Disable(); });
+            setRunAtLogin:      enabled => { if (enabled) StartupEntry.Enable(); else StartupEntry.Disable(); },
+            onFind: ShowQuickFind, onUndo: UndoLastAction, getUndoDescription: () => UndoHistory.Description);
 
         // A later launch (or our own SignalExistingInstance) asks us to surface the pickets. The
         // callback arrives on a thread-pool thread, so hop to the UI thread before touching windows.
@@ -236,6 +237,7 @@ public partial class App : Application
     /// spawned WorkerW (via PicketWindow.OnSourceInitialized) and re-hides its captured icons.</summary>
     private void ReattachPicketsToDesktop()
     {
+        ClearUndoHistory();
         Logger.Log("Explorer restarted -- respawning pickets onto the new WorkerW.");
         var states = _pickets.Select(f => f.ToState()).ToList();
         foreach (var f in _pickets.ToList())
@@ -296,6 +298,7 @@ public partial class App : Application
     /// every saved position into the visible work area first so nothing spawns off-screen.</summary>
     private void LoadActiveProfile()
     {
+        ClearUndoHistory();
         var profilePickets = LayoutStore.GetOrSeedProfile(_layout, _activeProfile);
         foreach (var state in profilePickets)
         {
@@ -563,6 +566,13 @@ public partial class App : Application
         else picket.JoinTouchingGroups();
         picket.FocusForKeyboard();
         MarkDirty();
+        RecordUndo("Picket added", () =>
+        {
+            var added = _pickets.FirstOrDefault(p => p.PicketId == state.Id);
+            if (added == null) return true;
+            DeletePicket(added);
+            return !_pickets.Contains(added);
+        });
         return picket;
     }
 
@@ -570,6 +580,9 @@ public partial class App : Application
     {
         var group = picket.SettleStack();
         var anchor = new Point(group[0].Left, group[0].Top);
+        var state = picket.ToState();
+        var references = picket.SnapshotReferences(picket.Items);
+        var order = group.Select(p => p.PicketId).ToArray();
         if (!picket.TryReleaseAllReferences()) return;
         _pickets.Remove(picket);
         picket.CloseForLayoutChange();
@@ -581,6 +594,15 @@ public partial class App : Application
             remaining[0].NormalizeConnectedGroup();
         }
         MarkDirty();
+        state.Items.Clear(); // Restore the original item instances, including earlier undo references.
+        RecordUndo($"“{state.Title}” picket removed", () =>
+        {
+            var restored = _pickets.FirstOrDefault(p => p.PicketId == state.Id) ?? SpawnPicket(state);
+            var complete = restored.RestoreReferences(references);
+            PicketWindow.RestoreGroupOrder(order, anchor);
+            MarkDirty();
+            return complete;
+        });
     }
 
     private PicketWindow SpawnPicket(PicketState state)
@@ -589,12 +611,14 @@ public partial class App : Application
         var picket = new PicketWindow(state);
         picket.LayoutChanged += (_, _) => MarkDirty();
         _pickets.Add(picket);
-        picket.Show();
+        PresentPicket(picket);
         if (PicketsHidden) picket.Hide();
         // Spawning a new picket may already overlap an existing one -- refresh everyone's link state.
         Frames.Request(RefreshPicketChrome);
         return picket;
     }
+
+    protected virtual void PresentPicket(PicketWindow picket) => picket.Show();
 
     /// <summary>Makes a picket's look follow it across every display. If the shared map already has
     /// an entry for this title, the picket adopts it; otherwise the picket's own saved look seeds the

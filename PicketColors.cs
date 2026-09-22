@@ -31,22 +31,22 @@ public static class PicketColors
     public static readonly IReadOnlyList<PicketColorScheme> All = new[]
     {
         new PicketColorScheme("porcelain", "Porcelain",
-            Color.FromRgb(0xF5,0xF2,0xEC), Color.FromRgb(0xE5,0xDF,0xD5),
+            Color.FromRgb(0xF1,0xE4,0xCE), Color.FromRgb(0xDF,0xC9,0xA9),
             Color.FromRgb(0xA7,0x9F,0x94), Color.FromRgb(0x6F,0x7F,0x91)),
         new PicketColorScheme("sandstone", "Sandstone",
-            Color.FromRgb(0xF3,0xEA,0xDC), Color.FromRgb(0xDD,0xC8,0xA8),
+            Color.FromRgb(0xF3,0xD3,0x9F), Color.FromRgb(0xE7,0xB9,0x74),
             Color.FromRgb(0xA0,0x80,0x55), Color.FromRgb(0xB8,0x70,0x3D)),
         new PicketColorScheme("sage", "Sage",
-            Color.FromRgb(0xE7,0xEE,0xE7), Color.FromRgb(0xC5,0xD5,0xC6),
+            Color.FromRgb(0xC9,0xE2,0xBF), Color.FromRgb(0xAA,0xCD,0x9F),
             Color.FromRgb(0x7B,0x96,0x80), Color.FromRgb(0x4F,0x7D,0x64)),
         new PicketColorScheme("ocean", "Ocean",
-            Color.FromRgb(0xE5,0xEF,0xF4), Color.FromRgb(0xB9,0xD1,0xDE),
+            Color.FromRgb(0xBF,0xDD,0xEB), Color.FromRgb(0x99,0xC4,0xDA),
             Color.FromRgb(0x6E,0x91,0xA4), Color.FromRgb(0x2E,0x75,0x9C)),
         new PicketColorScheme("lavender", "Lavender",
-            Color.FromRgb(0xEF,0xEB,0xF5), Color.FromRgb(0xD3,0xC8,0xE0),
+            Color.FromRgb(0xDD,0xCB,0xEE), Color.FromRgb(0xC5,0xAB,0xE0),
             Color.FromRgb(0x8E,0x7B,0xA5), Color.FromRgb(0x75,0x5A,0x99)),
         new PicketColorScheme("rose", "Rose",
-            Color.FromRgb(0xF4,0xE8,0xE9), Color.FromRgb(0xDF,0xC4,0xC8),
+            Color.FromRgb(0xF0,0xC6,0xD1), Color.FromRgb(0xDE,0xA5,0xB7),
             Color.FromRgb(0xA6,0x7B,0x84), Color.FromRgb(0xA8,0x4F,0x64)),
         new PicketColorScheme("midnight", "Midnight",
             Color.FromRgb(0x13,0x1B,0x29), Color.FromRgb(0x1D,0x35,0x55),
@@ -54,12 +54,18 @@ public static class PicketColors
         new PicketColorScheme("graphite", "Graphite",
             Color.FromRgb(0x18,0x1B,0x20), Color.FromRgb(0x29,0x2E,0x36),
             Color.FromRgb(0x58,0x61,0x6E), Color.FromRgb(0x8A,0xA0,0xB8)),
+        new PicketColorScheme("black", "Black",
+            Colors.Black, Color.FromRgb(0x10,0x10,0x10),
+            Color.FromRgb(0x55,0x55,0x55), Color.FromRgb(0xA0,0xA0,0xA0)),
+        new PicketColorScheme("white", "White",
+            Colors.White, Color.FromRgb(0xF2,0xF2,0xF2),
+            Color.FromRgb(0xB3,0xB3,0xB3), Color.FromRgb(0x77,0x77,0x77)),
     };
 
     private static readonly Dictionary<string, string> LegacyAliases =
         new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
         {
-            ["white"] = "porcelain", ["stone"] = "porcelain", ["cloud"] = "porcelain",
+            ["stone"] = "porcelain", ["cloud"] = "porcelain",
             ["frost"] = "porcelain",
             ["sand"] = "sandstone", ["butter"] = "sandstone", ["dune"] = "sandstone",
             ["peach"] = "sandstone", ["apricot"] = "sandstone",
@@ -68,7 +74,7 @@ public static class PicketColors
             ["lilac"] = "lavender", ["periwinkle"] = "lavender",
             ["bloom"] = "rose", ["blush"] = "rose", ["coral"] = "rose",
             ["slate"] = "midnight", ["nightfall"] = "midnight",
-            ["charcoal"] = "graphite", ["black"] = "graphite",
+            ["charcoal"] = "graphite",
         };
 
     public static Color ContrastForeground(Color surface)

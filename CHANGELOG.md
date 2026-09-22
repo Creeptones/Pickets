@@ -5,6 +5,30 @@ All notable changes to Pickets are documented here. Versions follow
 
 ## [Unreleased]
 
+- Drag feedback is cleared across pickets and after cancelled/finished drags, even if an item
+  disappears before its leave event reaches the window. New drags reset the Shell preview session;
+  accepted drops are completed in the window preview handler before child controls can consume them.
+- The first-run guide explains body drop locations, hidden desktop icons, safe removal, Undo,
+  search, and the difference between Hide and Quit.
+- A shorter README includes a desktop screenshot, with detailed usage and build instructions in
+  separate guides.
+
+- Undo supported organizational actions with Ctrl+Z, a brief Undo notification, or the title/tray
+  menu. Bulk actions are single undo steps; failed desktop recapture preserves references for retry.
+- Drag the entire selection with a count badge and destination outline. A contextual selection
+  strip provides Move, Size, Remove, and Clear without occupying space when selection is inactive.
+- Ctrl+F searches references across all current pickets and reveals results in collapsed sections.
+- Appearance → Height exposes automatic two-row sizing and manual height for the connected stack.
+
+- Picket surfaces and title bars have a subtle diagonal gradient. Acrylic uses a faint overlay
+  that retains its blur, while Windows high contrast keeps its system colors.
+
+- Light themes use richer cream, gold, green, blue, lavender, and pink pastel surfaces, with
+  coordinated title bars and matching color-menu swatches.
+
+- The title menu groups file, folder, and label creation under Add…. Color choices keep all eight
+  existing themes together, followed by dedicated neutral Black and White themes.
+
 - Rectangle selection inside pickets with Shift-add, Ctrl-toggle, Escape cancellation, and
   edge scrolling. Context menus apply supported actions to the selection, including reference
   transfers, icon sizing, availability checks, opening, and removal.

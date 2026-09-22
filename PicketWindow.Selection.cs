@@ -127,6 +127,7 @@ public partial class PicketWindow
         if (cancel) foreach (var item in Items) item.IsSelected = _boxOriginal.Contains(item);
         _boxOriginal.Clear();
         if (Mouse.Captured == BodyArea) Mouse.Capture(null);
+        UpdateSelectionActions();
     }
 
     private void Item_RightMouseDown(object sender, MouseButtonEventArgs e)
@@ -139,4 +140,58 @@ public partial class PicketWindow
 
     internal PicketItem[] ActionItems(PicketItem clicked)
         => clicked.IsSelected ? Items.Where(i => i.IsSelected).ToArray() : [clicked];
+
+    private void Items_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateSelectionActions();
+    private void SelectionActions_SizeChanged(object sender, SizeChangedEventArgs e) => QueueContentSizing();
+    private void UpdateSelectionActions()
+    {
+        if (SelectionActions == null || _boxStart != null) return;
+        var count = ItemsHost.SelectedItems.Count;
+        SelectionCount.Text = $"{count} selected";
+        SelectionActions.Visibility = count > 1 && !_isCollapsed ? Visibility.Visible : Visibility.Collapsed;
+    }
+    private void SelectionClear_Click(object sender, RoutedEventArgs e) { ItemsHost.UnselectAll(); ItemsHost.Focus(); }
+    private void SelectionRemove_Click(object sender, RoutedEventArgs e) => RemoveReferences(ItemsHost.SelectedItems.Cast<PicketItem>());
+    private void SelectionMove_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || Application.Current is not App app) return;
+        var selected = ItemsHost.SelectedItems.Cast<PicketItem>().ToArray();
+        var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
+        foreach (var target in app.Pickets.Where(p => p != this))
+        {
+            var entry = new MenuItem { Header = target.ToState().Title,
+                IsEnabled = selected.Any(item => item.Kind == ItemKind.Label || !target.Items.Any(i => i.Kind == ItemKind.File &&
+                    string.Equals(i.Path, item.Path, StringComparison.OrdinalIgnoreCase))) };
+            entry.Click += (_, _) => MoveReferencesTo(selected, target);
+            menu.Items.Add(entry);
+        }
+        if (menu.Items.Count == 0) menu.Items.Add(new MenuItem { Header = "No other pickets", IsEnabled = false });
+        menu.IsOpen = true;
+    }
+    private void SelectionSize_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button) return;
+        var selected = ItemsHost.SelectedItems.Cast<PicketItem>().Where(i => i.Kind == ItemKind.File).ToArray();
+        var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
+        foreach (var large in new[] { false, true })
+        {
+            var entry = new MenuItem { Header = large ? "Large icons" : "Small icons", IsEnabled = selected.Length > 0 };
+            entry.Click += (_, _) => SetIconSizes(selected, large);
+            menu.Items.Add(entry);
+        }
+        menu.IsOpen = true;
+    }
+    internal void SetIconSizes(PicketItem[] items, bool large)
+    {
+        var changed = items.Where(i => i.Kind == ItemKind.File && i.IsLarge != large).Select(i => (Item: i, Before: i.IsLarge)).ToArray();
+        foreach (var entry in changed) entry.Item.IsLarge = large;
+        RaiseLayoutChanged();
+        if (changed.Length > 0 && Application.Current is App app)
+            app.RecordUndo("Icon size changed", () =>
+            {
+                foreach (var entry in changed) entry.Item.IsLarge = entry.Before;
+                RaiseLayoutChanged();
+                return true;
+            });
+    }
 }

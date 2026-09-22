@@ -342,6 +342,7 @@ public partial class PicketWindow
 
     private void UpdateExpansionControls()
     {
+        UpdateSelectionActions();
         BodyScroll.Visibility = _isCollapsed ? Visibility.Collapsed : Visibility.Visible;
         TitleToggle.IsExpanded = !_isCollapsed;
         ChevronRotation.Angle = _isCollapsed ? 0 : 90;
@@ -390,6 +391,8 @@ public partial class PicketWindow
         var group = ComputeTouchingCluster();
         var index = group.IndexOf(this);
         var next = Math.Clamp(index + delta, 0, group.Count - 1);
+        if (next == index) return;
+        var previousOrder = group.Select(p => p.PicketId).ToArray();
         (group[index], group[next]) = (group[next], group[index]);
         var anchor = new Point(group.Min(p => p.Left), group.Min(p => p.Top));
         for (var i = 0; i < group.Count; i++) group[i].GroupOrder = i;
@@ -397,5 +400,19 @@ public partial class PicketWindow
         group[0].Top = anchor.Y;
         group[0].NormalizeConnectedGroup();
         RevealOnStackPage();
+        if (Application.Current is App app)
+            app.RecordUndo("Picket reordered", () => RestoreGroupOrder(previousOrder, anchor));
+    }
+
+    internal static bool RestoreGroupOrder(string[] ids, Point anchor)
+    {
+        if (Application.Current is not App app) return false;
+        var group = ids.Select(id => app.Pickets.FirstOrDefault(p => p.PicketId == id)).ToArray();
+        if (group.Any(p => p == null)) return false;
+        for (var i = 0; i < group.Length; i++) group[i]!.GroupOrder = i;
+        group[0]!.Left = anchor.X;
+        group[0]!.Top = anchor.Y;
+        group[0]!.NormalizeConnectedGroup();
+        return true;
     }
 }

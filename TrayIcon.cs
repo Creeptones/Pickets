@@ -29,12 +29,18 @@ public sealed class TrayIcon : IDisposable
         Action onExitHidden,
         Action onAbout,
         Func<bool> getRunAtLogin,
-        Action<bool> setRunAtLogin)
+        Action<bool> setRunAtLogin,
+        Action onFind,
+        Action onUndo,
+        Func<string?> getUndoDescription)
     {
         var menu = new ContextMenuStrip();
 
         menu.Items.Add(new ToolStripMenuItem("Show / hide pickets", null, (_, _) => onToggleVisibility()));
         menu.Items.Add(new ToolStripMenuItem("Focus Pickets", null, (_, _) => onFocus()));
+        menu.Items.Add(new ToolStripMenuItem("Find reference...", null, (_, _) => onFind()));
+        var undo = new ToolStripMenuItem("Undo", null, (_, _) => onUndo());
+        menu.Items.Add(undo);
         menu.Items.Add(new ToolStripMenuItem("Change focus shortcut...", null, (_, _) => onShortcutSettings()));
         menu.Items.Add(new ToolStripMenuItem("Keyboard help...", null, (_, _) => onKeyboardHelp()));
         menu.Items.Add(new ToolStripMenuItem("New picket", null, (_, _) => onNewPicket()));
@@ -56,7 +62,13 @@ public sealed class TrayIcon : IDisposable
 
         // Sync the checkmark to actual registry state every time the menu opens, so a change made
         // from a picket's title menu (or another tool) is always reflected.
-        menu.Opening += (_, _) => runAtLogin.Checked = getRunAtLogin();
+        menu.Opening += (_, _) =>
+        {
+            runAtLogin.Checked = getRunAtLogin();
+            var description = getUndoDescription();
+            undo.Enabled = description != null;
+            undo.Text = description == null ? "Undo" : "Undo: " + description.Replace("&", "&&", StringComparison.Ordinal);
+        };
 
         _icon = new NotifyIcon
         {

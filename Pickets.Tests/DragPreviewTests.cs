@@ -35,6 +35,7 @@ public sealed class DragPreviewTests
                 { Width = 16, Height = 16, WindowStyle = unchecked((int)0x80000000), PositionX = -32000, PositionY = -32000 });
                 foreach (var scale in new[] { 1.0, 1.25, 1.5, 2.0 })
                 foreach (var large in new[] { false, true })
+                foreach (var count in new[] { 1, 3 })
                 {
                     var icon = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null,
                         new byte[] { 220, 150, 30, 255, 220, 150, 30, 255, 220, 150, 30, 255, 220, 150, 30, 255 }, 8);
@@ -47,14 +48,14 @@ public sealed class DragPreviewTests
                     };
                     // Cover both cached thumbnails and the fallback for a missing/not-yet-loaded icon.
                     if (large) item.RefreshAsync().GetAwaiter().GetResult();
-                    var preview = DragPreview.Render(item, new DpiScale(scale, scale));
+                    var preview = DragPreview.Render(item, new DpiScale(scale, scale), count);
                     var output = Environment.GetEnvironmentVariable("PICKETS_TEST_RENDER_DIR");
                     if (!string.IsNullOrEmpty(output))
                     {
                         Directory.CreateDirectory(output);
                         var encoder = new PngBitmapEncoder();
                         encoder.Frames.Add(BitmapFrame.Create(preview));
-                        using var stream = File.Create(Path.Combine(output, $"drag-preview-{scale}-{large}.png"));
+                        using var stream = File.Create(Path.Combine(output, $"drag-preview-{scale}-{large}-{count}.png"));
                         encoder.Save(stream);
                     }
                     Assert.Equal((int)Math.Ceiling(160 * scale), preview.PixelWidth);
@@ -88,6 +89,12 @@ public sealed class DragPreviewTests
                         Assert.False(target.IsActive);
                         target.Leave();
                         target.Over(window.Handle, incoming, cursor, DragDropEffects.Move);
+                        // A new drag can arrive without the old visual target receiving Leave.
+                        var nextDrag = new DataObject((System.Runtime.InteropServices.ComTypes.IDataObject)data);
+                        target.Over(window.Handle, nextDrag, cursor, DragDropEffects.Link);
+                        Assert.True(target.IsActive);
+                        target.Drop(nextDrag, cursor, DragDropEffects.Link);
+                        Assert.False(target.IsActive);
                         target.Dispose();
                         Assert.False(target.IsActive);
                     }

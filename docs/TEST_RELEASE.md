@@ -7,6 +7,12 @@ test and record what happened. Leave unavailable hardware marked **NOT TESTED**.
 Build: use `release/Pickets.exe` and `release/PicketsSetup.exe` from this checkout.
 `release/TEST_BUILD.txt` identifies the candidate; `release/SHA256SUMS.txt` identifies the exact files.
 
+**Latest interaction candidate:** `release/drag-fix/Pickets.exe` includes drag-session cleanup,
+Undo, multi-item dragging, selection actions, search, and height controls.
+Its `TEST_BUILD.txt` identifies that local build.
+The older installer does not validate those changes. Before final sign-off, rebuild both release
+assets from the same approved commit and test those exact files using the paths above.
+
 **Before you start — about 2 minutes**
 
 - [ ] Choose **Quit Pickets** from the tray. Starting a new copy while the old one is running just
@@ -17,6 +23,11 @@ Build: use `release/Pickets.exe` and `release/PicketsSetup.exe` from this checko
 
 **Round 1 — does everyday use feel safe? About 5 minutes**
 
+- [ ] **Repeat drops across sections.** Drag a disposable desktop shortcut over every open section,
+      then press Escape. Move a captured item between two pickets, out to the desktop, and back.
+      Repeat three times, including after collapsing/reopening a section.
+      **Pass:** every eligible body accepts the drag, cancelled drags leave no outlines, and each
+      completed transfer leaves one reference in its destination. Titles still reject drops.
 - [ ] **Capture and return.** Drag **Pickets test** into a picket, then remove it.
       **Pass:** its desktop icon returns; the shortcut still opens its original target.
 - [ ] **Visible drags.** Slowly drag **Pickets test** from the desktop across a title and into an
@@ -47,6 +58,17 @@ Build: use `release/Pickets.exe` and `release/PicketsSetup.exe` from this checko
       Escape cancels the pending click. Repeat at another display scaling if available.
 
 **Round 2 — the recovery blocker. About 10 minutes**
+
+- [ ] **QoL: selection and undo.** Select two disposable references, verify “2 selected,” and drag
+      them into another picket. **Pass:** the preview shows 2, the destination highlights, both move,
+      and Ctrl+Z returns both in order. Remove both, then use Undo; references and ownership return.
+      Delete a disposable picket and undo from the tray. Repeat with one duplicate at the destination;
+      the duplicate stays in the source. Escape cancels dragging without moving anything.
+- [ ] **QoL: find and height.** Collapse a picket, press Ctrl+F in another picket, search for a known
+      item and press Enter. **Pass:** its picket opens and the item is focused and scrolled into view.
+      Resize a stack vertically, then choose Appearance → Height → Automatic (up to two rows).
+      **Pass:** content sizing returns, including after a restart; the selection strip does not clip
+      the second icon row when the screen has enough room.
 
 - [ ] **Rectangle and bulk actions.** Drag from empty space across two references, then right-click
       a selected item and toggle Large icon. **Pass:** both icons change and the others do not.

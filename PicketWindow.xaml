@@ -38,9 +38,13 @@
             <MenuItem Header="Remove label" Click="LabelMenu_Remove_Click"/>
         </ContextMenu>
         <ContextMenu x:Key="TitleContextMenu">
-            <MenuItem Header="Add files..." InputGestureText="Ctrl+O" Click="AddFiles_Click"/>
-            <MenuItem Header="Add folders..." InputGestureText="Ctrl+Shift+O" Click="AddFolder_Click"/>
-            <MenuItem Header="Add label..." Click="TitleMenu_AddLabel_Click"/>
+            <MenuItem Header="Add…">
+                <MenuItem Header="Add files..." InputGestureText="Ctrl+O" Click="AddFiles_Click"/>
+                <MenuItem Header="Add folders..." InputGestureText="Ctrl+Shift+O" Click="AddFolder_Click"/>
+                <MenuItem Header="Add label..." Click="TitleMenu_AddLabel_Click"/>
+            </MenuItem>
+            <MenuItem Header="Find reference…" InputGestureText="Ctrl+F" Click="FindReference_Click"/>
+            <MenuItem Header="Undo" Tag="Undo" InputGestureText="Ctrl+Z" Click="Undo_Click"/>
             <Separator/>
             <MenuItem Header="Rename picket..." InputGestureText="F2" Click="TitleMenu_Rename_Click"/>
             <MenuItem Header="Stack" Tag="StackMenu">
@@ -53,31 +57,41 @@
                 <MenuItem Header="Next page" Tag="NextPage" InputGestureText="Ctrl+PageDown" Click="NextStackPage_Click"/>
             </MenuItem>
             <MenuItem Header="Appearance">
+                <MenuItem Header="Height">
+                    <MenuItem Header="Automatic (up to two rows)" Tag="AutoHeight" IsCheckable="True" Click="AutoHeight_Click"/>
+                    <MenuItem Header="Manual" Tag="ManualHeight" IsCheckable="True" Click="ManualHeight_Click"/>
+                </MenuItem>
                 <MenuItem Header="Color" Tag="ColorMenu">
                 <MenuItem Header="Porcelain" Tag="porcelain" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#A79F94" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#E5DFD5" Offset="0.5"/><GradientStop Color="#F5F2EC" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#A79F94" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#DFC9A9" Offset="0.5"/><GradientStop Color="#F1E4CE" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="Sandstone" Tag="sandstone" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#A08055" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#DDC8A8" Offset="0.5"/><GradientStop Color="#F3EADC" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#A08055" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#E7B974" Offset="0.5"/><GradientStop Color="#F3D39F" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="Sage" Tag="sage" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#7B9680" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#C5D5C6" Offset="0.5"/><GradientStop Color="#E7EEE7" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#7B9680" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#AACD9F" Offset="0.5"/><GradientStop Color="#C9E2BF" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="Ocean" Tag="ocean" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#6E91A4" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#B9D1DE" Offset="0.5"/><GradientStop Color="#E5EFF4" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#6E91A4" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#99C4DA" Offset="0.5"/><GradientStop Color="#BFDDEB" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="Lavender" Tag="lavender" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#8E7BA5" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#D3C8E0" Offset="0.5"/><GradientStop Color="#EFEBF5" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#8E7BA5" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#C5ABE0" Offset="0.5"/><GradientStop Color="#DDCBEE" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="Rose" Tag="rose" IsCheckable="True" Click="TitleMenu_SetColor_Click">
-                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#A67B84" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#DFC4C8" Offset="0.5"/><GradientStop Color="#F4E8E9" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#A67B84" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#DEA5B7" Offset="0.5"/><GradientStop Color="#F0C6D1" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
-                <Separator/>
                 <MenuItem Header="Midnight" Tag="midnight" IsCheckable="True" Click="TitleMenu_SetColor_Click">
                     <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#496B91" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#1D3555" Offset="0.5"/><GradientStop Color="#131B29" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="Graphite" Tag="graphite" IsCheckable="True" Click="TitleMenu_SetColor_Click">
                     <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#58616E" StrokeThickness="1"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#292E36" Offset="0.5"/><GradientStop Color="#181B20" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
+                </MenuItem>
+                <Separator/>
+                <MenuItem Header="Black" Tag="black" IsCheckable="True" Click="TitleMenu_SetColor_Click">
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#555555"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#101010" Offset="0.5"/><GradientStop Color="#000000" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="White" Tag="white" IsCheckable="True" Click="TitleMenu_SetColor_Click">
+                    <MenuItem.Icon><Rectangle Width="14" Height="14" Stroke="#B3B3B3"><Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#F2F2F2" Offset="0.5"/><GradientStop Color="#FFFFFF" Offset="0.5"/></LinearGradientBrush></Rectangle.Fill></Rectangle></MenuItem.Icon>
                 </MenuItem>
                 <Separator/>
                 <MenuItem Header="Apply current theme to all Pickets" Click="TitleMenu_ApplyColorToAll_Click"/>
@@ -228,6 +242,17 @@
                         </StackPanel>
                     </Grid>
                 </Border>
+                <Border x:Name="SelectionActions" DockPanel.Dock="Top" Visibility="Collapsed" Padding="5,3"
+                        Background="{Binding Background, ElementName=TitleShell}" SizeChanged="SelectionActions_SizeChanged"
+                        TextElement.Foreground="{DynamicResource PicketItemForeground}">
+                    <WrapPanel VerticalAlignment="Center">
+                        <TextBlock x:Name="SelectionCount" VerticalAlignment="Center" Margin="3,0,10,0" AutomationProperties.LiveSetting="Polite"/>
+                        <Button Content="Move" Padding="6,3" Style="{StaticResource HeaderButton}" Click="SelectionMove_Click" AutomationProperties.Name="Move selected items"/>
+                        <Button Content="Size" Padding="6,3" Style="{StaticResource HeaderButton}" Click="SelectionSize_Click" AutomationProperties.Name="Size selected icons"/>
+                        <Button Content="Remove" Padding="6,3" Style="{StaticResource HeaderButton}" Click="SelectionRemove_Click" AutomationProperties.Name="Remove selected references"/>
+                        <Button Content="Clear" Padding="6,3" Style="{StaticResource HeaderButton}" Click="SelectionClear_Click" AutomationProperties.Name="Clear selection"/>
+                    </WrapPanel>
+                </Border>
                 <Grid x:Name="BodyArea" ClipToBounds="True"
                       PreviewMouseLeftButtonDown="Selection_MouseDown" PreviewMouseMove="Selection_MouseMove"
                       PreviewMouseLeftButtonUp="Selection_MouseUp" LostMouseCapture="Selection_LostCapture">
@@ -238,7 +263,7 @@
                               Drop="ItemsHost_Drop"
                               Background="Transparent">
                     <Grid>
-                    <ListBox x:Name="ItemsHost" SelectionMode="Extended" BorderThickness="0" Padding="0" Background="Transparent"
+                    <ListBox x:Name="ItemsHost" SelectionMode="Extended" BorderThickness="0" Padding="0" Background="Transparent" SelectionChanged="Items_SelectionChanged"
                         AutomationProperties.Name="Picket references" KeyboardNavigation.TabNavigation="Once"
                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
                         <ListBox.ItemContainerStyle>
@@ -341,6 +366,8 @@
                     <Rectangle x:Name="SelectionBox" Visibility="Collapsed" Stroke="{DynamicResource PicketFocusBorder}"
                                StrokeThickness="1" Fill="{DynamicResource PicketSelectionBrush}" Opacity="0.55"/>
                 </Canvas>
+                <Border x:Name="DropTargetOutline" IsHitTestVisible="False" Visibility="Collapsed" BorderThickness="2"
+                        BorderBrush="{DynamicResource PicketFocusBorder}" CornerRadius="3" Margin="2"/>
                 </Grid>
             </DockPanel>
         </Border>

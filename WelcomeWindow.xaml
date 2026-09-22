@@ -84,9 +84,12 @@
 
             <TextBlock Margin="0,20,0,0" FontSize="16" FontWeight="SemiBold" Text="3   Start with one picket"/>
             <StackPanel Margin="28,3,0,0">
-                <TextBlock Foreground="{DynamicResource DialogMuted}" Text="Use Add files or Add folders in an empty picket to save references. You can also drag desktop icons in to hide their desktop duplicates." TextWrapping="Wrap"/>
+                <TextBlock Foreground="{DynamicResource DialogMuted}" Text="Use Add files or Add folders in an empty picket, or ⋯ → Add… anytime. Your original files stay where they are." TextWrapping="Wrap"/>
+                <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource DialogMuted}" Text="Drop desktop icons inside an open section, below its title. Their desktop icons are hidden while captured. Drag items between open sections to organize them." TextWrapping="Wrap"/>
                 <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource DialogMuted}" Text="Click a title to roll it up; drag the title to move the group." TextWrapping="Wrap"/>
                 <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource DialogMuted}" Text="Ctrl+Alt+D focuses Pickets by default; press again while focused to hide. Change the shortcut or open keyboard help from the tray." TextWrapping="Wrap"/>
+                <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource DialogMuted}" Text="Delete removes a reference, never the file. Drag a captured icon back to the desktop to return it. Ctrl+Z undoes supported organizing actions; Ctrl+F finds references." TextWrapping="Wrap"/>
+                <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource DialogMuted}" Text="Tray → Quit Pickets restores captured desktop icons until your next launch. Alt+F4 only hides Pickets." TextWrapping="Wrap"/>
             </StackPanel>
         </StackPanel>
         </ScrollViewer>

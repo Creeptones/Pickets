@@ -8,7 +8,7 @@ namespace Pickets;
 
 internal static class DragPreview
 {
-    internal static BitmapSource Render(PicketItem item, DpiScale dpi)
+    internal static BitmapSource Render(PicketItem item, DpiScale dpi, int count = 1)
     {
         var iconSize = item.IconSize;
         const double width = 160;
@@ -23,7 +23,16 @@ internal static class DragPreview
                 drawing.DrawRoundedRectangle(Brushes.DimGray, new Pen(Brushes.White, 2),
                     new Rect(bounds.Left + iconSize * 0.2, 2, iconSize * 0.6, iconSize - 4), 2, 2);
             }
-            var text = new FormattedText(item.DisplayName, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+            if (count > 1)
+            {
+                var badge = new FormattedText(count.ToString(CultureInfo.CurrentCulture), CultureInfo.CurrentUICulture,
+                    FlowDirection.LeftToRight, new Typeface("Segoe UI"), 12, Brushes.White, dpi.PixelsPerDip);
+                var badgeRect = new Rect(bounds.Right - 12, 2, Math.Max(24, badge.Width + 12), 22);
+                drawing.DrawRoundedRectangle(Brushes.DodgerBlue, new Pen(Brushes.White, 1), badgeRect, 8, 8);
+                drawing.DrawText(badge, new Point(badgeRect.Left + (badgeRect.Width - badge.Width) / 2, 4));
+            }
+            var name = count > 1 ? $"{count} items" : item.Kind == ItemKind.Label ? item.LabelText : item.DisplayName;
+            var text = new FormattedText(name, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
                 new Typeface(SystemFonts.MessageFontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
                 12, Brushes.White, dpi.PixelsPerDip)
             {

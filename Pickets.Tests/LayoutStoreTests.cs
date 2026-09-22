@@ -54,14 +54,14 @@ public sealed class LayoutStoreTests
         Assert.Equal("solid", state.TransparencyKey);
         Assert.Equal(100, state.TransparencyCustomPercent);
         Assert.Empty(state.Items);
-        Assert.Equal("graphite", layout.DefaultColorKey);
+        Assert.Equal("black", layout.DefaultColorKey);
     }
 
     [Theory]
-    [InlineData("white", "porcelain")]
+    [InlineData("white", "white")]
     [InlineData("teal", "ocean")]
-    [InlineData("black", "graphite")]
+    [InlineData("black", "black")]
     [InlineData("not-a-theme", "porcelain")]
-    public void LegacyThemeAliasesResolve(string legacy, string expected)
-        => Assert.Equal(expected, PicketColors.Get(legacy).Key);
+    public void CanonicalAndLegacyThemeKeysResolve(string key, string expected)
+        => Assert.Equal(expected, PicketColors.Get(key).Key);
 }

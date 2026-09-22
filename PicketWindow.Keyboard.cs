@@ -55,6 +55,17 @@ public partial class PicketWindow
         if (Application.Current is App app) app.ConfigureFocusShortcut(this);
     }
 
+    private void Undo_Click(object sender, RoutedEventArgs e) => (Application.Current as App)?.UndoLastAction();
+    private void FindReference_Click(object sender, RoutedEventArgs e) => (Application.Current as App)?.ShowQuickFind();
+    internal void RevealReference(PicketItem item)
+    {
+        if (!Items.Contains(item)) return;
+        SetExpanded(true);
+        SettleStack();
+        FocusForKeyboard();
+        Dispatcher.BeginInvoke(() => { if (Items.Contains(item)) FocusItem(Items.IndexOf(item)); }, DispatcherPriority.Loaded);
+    }
+
     internal static void ShowKeyboardHelp()
         => new KeyboardHelpWindow(Application.Current is App app ? app.CurrentFocusShortcut : "Ctrl+Alt+D").Show();
 
@@ -79,6 +90,8 @@ public partial class PicketWindow
             return;
         }
         if (key == Key.F1) ShowKeyboardHelp();
+        else if (key == Key.F && ctrl && !alt) (Application.Current as App)?.ShowQuickFind();
+        else if (key == Key.Z && ctrl && !alt && !shift && Application.Current is App undoApp) undoApp.UndoLastAction();
         else if (ctrl && key is Key.PageUp or Key.PageDown) ChangeStackPage(key == Key.PageUp ? -1 : 1);
         else if (key == Key.Tab && ctrl && Application.Current is App app) app.FocusNextPicket(this, shift ? -1 : 1);
         else if (key == Key.O && ctrl && !alt) { if (shift) AddFolder(); else AddFiles(); }
@@ -98,7 +111,7 @@ public partial class PicketWindow
             {
                 var from = ItemsHost.SelectedIndex;
                 var to = Math.Clamp(from + delta, 0, Items.Count - 1);
-                Items.Move(from, to);
+                ReorderReference(from, to);
                 FocusItem(to);
             }
             else MoveSection(delta);

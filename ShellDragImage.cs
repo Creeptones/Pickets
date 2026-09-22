@@ -15,6 +15,7 @@ internal sealed class ShellDragImage : IDisposable
     private IDropTargetHelper? _target;
     private bool _entered;
     private bool _unavailable;
+    private System.Windows.IDataObject? _activeData;
     internal bool IsActive => _entered;
 
     internal void Over(IntPtr window, System.Windows.IDataObject data, POINT point, DragDropEffects effect)
@@ -22,11 +23,15 @@ internal sealed class ShellDragImage : IDisposable
         if (_unavailable || data is not ComDataObject native) return;
         try
         {
+            // A removed item can detach WPF's previous target before DragLeave bubbles to
+            // the window. Never reuse the Shell session for a different drag's data object.
+            if (_entered && !ReferenceEquals(_activeData, data)) Leave();
             _helper ??= new DragDropHelper();
             _target ??= (IDropTargetHelper)_helper;
             var result = _entered ? _target.DragOver(ref point, (uint)effect)
                 : _target.DragEnter(window, native, ref point, (uint)effect);
             Marshal.ThrowExceptionForHR(result);
+            _activeData = data;
             _entered = true;
         }
         catch (Exception ex) when (ex is COMException or InvalidCastException)
@@ -50,6 +55,7 @@ internal sealed class ShellDragImage : IDisposable
     {
         if (!_entered) return;
         _entered = false;
+        _activeData = null;
         _target?.DragLeave();
     }
 

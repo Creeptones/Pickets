@@ -13,9 +13,24 @@ public partial class PicketWindow
     private readonly HashSet<PicketItem> _sizingItems = new();
 
     private double MeasureContentHeight(double width)
-        => Items.Count == 0 || _contentRowsHeight == null
+        => (SelectionActions?.Visibility == Visibility.Visible ? SelectionActions.ActualHeight : 0) + (Items.Count == 0 || _contentRowsHeight == null
             ? Math.Max(PicketContentSizing.EmptyHeight, 40 + 9 * PicketContentSizing.LineHeight(FontSize))
-            : Math.Ceiling(StackLayout.TitleHeight + 10 + _contentRowsHeight.Value);
+            : Math.Ceiling(StackLayout.TitleHeight + 10 + _contentRowsHeight.Value));
+
+    internal void SetAutomaticHeight(bool automatic)
+    {
+        var group = SettleStack();
+        foreach (var picket in group)
+        {
+            picket._autoSizeRows = automatic;
+            if (!automatic && !picket._isCollapsed) picket._expandedHeight = picket.Height;
+        }
+        NormalizeConnectedGroup();
+        foreach (var picket in group) picket.QueueContentSizing();
+    }
+
+    private void AutoHeight_Click(object sender, RoutedEventArgs e) => SetAutomaticHeight(true);
+    private void ManualHeight_Click(object sender, RoutedEventArgs e) => SetAutomaticHeight(false);
 
     private void ContentRowsMeasured(object? sender, EventArgs e)
     {

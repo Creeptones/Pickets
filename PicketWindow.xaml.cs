@@ -19,6 +19,7 @@ namespace Pickets;
 public partial class PicketWindow : Window
 {
     public string PicketId { get; }
+    internal string DisplayTitle => TitleText.Text;
     public ObservableCollection<PicketItem> Items { get; } = new();
 
     /// <summary>Raised whenever the picket's persistent state changes (move, resize, item add/remove).</summary>
@@ -128,11 +129,12 @@ public partial class PicketWindow : Window
         {
             EndBoxSelection(cancel: true);
             _finishRollAnimation?.Invoke();
+            ClearDropFeedback();
             _dropImage.Dispose();
             StopWatchingContentItems();
             SystemParameters.StaticPropertyChanged -= AccessibilitySettingsChanged;
         };
-        IsVisibleChanged += (_, _) => { if (!IsVisible) { _dropImage.Leave(); EndBoxSelection(cancel: true); } };
+        IsVisibleChanged += (_, _) => { if (!IsVisible) { ClearDropFeedback(); EndBoxSelection(cancel: true); } };
     }
 
     public PicketState ToState() => new()
@@ -586,6 +588,14 @@ public partial class PicketWindow : Window
 
     private void PrepareTitleMenu(ContextMenu cm)
     {
+        if (FindMenuItemByTag(cm.Items, "AutoHeight") is MenuItem autoHeight) autoHeight.IsChecked = _autoSizeRows;
+        if (FindMenuItemByTag(cm.Items, "ManualHeight") is MenuItem manualHeight) manualHeight.IsChecked = !_autoSizeRows;
+        if (FindMenuItemByTag(cm.Items, "Undo") is MenuItem undo)
+        {
+            var description = (Application.Current as App)?.UndoHistory.Description;
+            undo.IsEnabled = description != null;
+            undo.Header = description == null ? "Undo" : "Undo: " + description;
+        }
         var group = ComputeTouchingCluster();
         var position = group.IndexOf(this);
         if (FindMenuItemByTag(cm.Items, "StackMenu") is MenuItem stack)
@@ -668,19 +678,13 @@ public partial class PicketWindow : Window
         var scheme = PicketColors.Get(_colorKey);
         var factor = CurrentTransparencyPercent / 100.0;
 
-        // When blur is on, the system acrylic provides the background color via its gradient tint,
-        // so we intentionally paint the shell nearly transparent -- otherwise a second opaque layer
-        // sits on top of the blur and defeats it. We use alpha=1 (not 0) because this window is
-        // layered (AllowsTransparency=True): fully transparent pixels are click-through at the OS
-        // level, so Explorer drops would fall past the picket onto the desktop behind it.
-        Color bgColor = _blurEnabled
-            ? Color.FromArgb(1, 0, 0, 0)
-            : ScaleAlpha(scheme.Background, factor);
-        var bg = FrozenBrush(bgColor);
+        // Acrylic supplies its own tint; use only a faint light/shadow overlay over it.
+        // Its minimum alpha stays nonzero so native mouse and Explorer drops still hit the body.
+        var bg = SurfaceGradient(scheme.Background, factor, _blurEnabled);
         // Transparency applies fully to the content canvas, but navigation chrome keeps enough
         // surface behind its contrast-selected text to remain readable on any wallpaper.
         var chromeFactor = Math.Max(0.72, factor);
-        var titleB   = FrozenBrush(ScaleAlpha(scheme.TitleBackground, chromeFactor));
+        var titleB   = SurfaceGradient(scheme.TitleBackground, chromeFactor);
         var border   = FrozenBrush(ScaleAlpha(scheme.Border, Math.Max(0.55, factor)));
         var titleFg  = FrozenBrush(scheme.TitleForeground); // text always opaque
         var itemFg   = FrozenBrush(scheme.ItemForeground);
@@ -748,6 +752,32 @@ public partial class PicketWindow : Window
     private static SolidColorBrush FrozenBrush(Color color)
     {
         var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
+
+    private static LinearGradientBrush SurfaceGradient(Color color, double opacity, bool acrylic = false)
+    {
+        static Color Shade(Color source, double amount)
+        {
+            byte Channel(byte value) => (byte)Math.Round(amount >= 0
+                ? value + (255 - value) * amount : value * (1 + amount));
+            return Color.FromArgb(source.A, Channel(source.R), Channel(source.G), Channel(source.B));
+        }
+        var stops = acrylic
+            ? new GradientStopCollection
+            {
+                new(Color.FromArgb((byte)Math.Max(1, Math.Round(14 * opacity)), 255, 255, 255), 0),
+                new(Color.FromArgb(1, 0, 0, 0), 0.45),
+                new(Color.FromArgb((byte)Math.Max(1, Math.Round(10 * opacity)), 0, 0, 0), 1)
+            }
+            : new GradientStopCollection
+            {
+                new(ScaleAlpha(Shade(color, 0.06), opacity), 0),
+                new(ScaleAlpha(color, opacity), 0.45),
+                new(ScaleAlpha(Shade(color, -0.04), opacity), 1)
+            };
+        var brush = new LinearGradientBrush(stops, new Point(0, 0), new Point(1, 1));
         brush.Freeze();
         return brush;
     }
@@ -914,7 +944,10 @@ public partial class PicketWindow : Window
 
     // === Drag-drop into the picket body ===
     private const string PicketItemDragFormat = "Pickets.PicketItemDrag";
-    private sealed record PicketItemDragPayload(PicketWindow Source, PicketItem Item);
+    private sealed record PicketItemDragPayload(PicketWindow Source, PicketItem Item)
+    {
+        public PicketItem[] Items { get; init; } = [Item];
+    }
 
     private readonly ShellDragImage _dropImage = new();
     private string? _lastDropDecision;
@@ -924,13 +957,25 @@ public partial class PicketWindow : Window
         var position = e.GetPosition(BodyScroll);
         var overBody = BodyScroll.IsVisible && position.X >= 0 && position.Y >= 0 &&
             position.X < BodyScroll.ActualWidth && position.Y < BodyScroll.ActualHeight;
+        if (e.Data.GetDataPresent(PicketItemDragFormat) && e.Data.GetData(PicketItemDragFormat) is PicketItemDragPayload payload &&
+            (payload.Source == this || !payload.Items.Any(item => payload.Source.Items.Contains(item) &&
+                (item.Kind == ItemKind.Label || !Items.Any(i => i.Kind == ItemKind.File &&
+                    string.Equals(i.Path, item.Path, StringComparison.OrdinalIgnoreCase)))))) return DragDropEffects.None;
         return DragPreview.DropEffect(overBody, e.Data.GetDataPresent(PicketItemDragFormat),
             e.Data.GetDataPresent(DataFormats.FileDrop), e.AllowedEffects);
     }
 
     private void Picket_DragOver(object sender, DragEventArgs e)
     {
+        if (e.RoutedEvent == DragDrop.PreviewDragEnterEvent) _dropImage.Leave();
+        if (Application.Current is App app)
+        {
+            foreach (var picket in app.Pickets)
+                if (picket != this) picket.ClearDropFeedback();
+            app.Frames.AddAnimation(CheckDropFeedback);
+        }
         e.Effects = GetDropEffect(e);
+        DropTargetOutline.Visibility = e.Effects == DragDropEffects.None ? Visibility.Collapsed : Visibility.Visible;
         LogDropDecision(e, "hover");
         if (WindowInterop.GetCursorPos(out var cursor))
             _dropImage.Over(new WindowInteropHelper(this).Handle, e.Data, cursor, e.Effects);
@@ -939,8 +984,27 @@ public partial class PicketWindow : Window
 
     private void Picket_DragLeave(object sender, DragEventArgs e)
     {
+        ClearDropFeedback();
+    }
+
+    private void ClearDropFeedback()
+    {
+        DropTargetOutline.Visibility = Visibility.Collapsed;
         _dropImage.Leave();
         _lastDropDecision = null;
+        if (Application.Current is App app) app.Frames.RemoveAnimation(CheckDropFeedback);
+    }
+
+    private void CheckDropFeedback(TimeSpan time)
+    {
+        // OLE can send DragLeave to an item removed during a transfer. Its old window no
+        // longer receives that routed event, so retire the visual/native session explicitly.
+        if ((WindowInterop.GetAsyncKeyState(0x01) & 0x8000) == 0 ||
+            !WindowInterop.GetCursorPos(out var cursor)) { ClearDropFeedback(); return; }
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero || !WindowInterop.GetWindowRect(hwnd, out var bounds) ||
+            cursor.X < bounds.left || cursor.Y < bounds.top || cursor.X >= bounds.right || cursor.Y >= bounds.bottom)
+            ClearDropFeedback();
     }
 
     private void Picket_PreviewDrop(object sender, DragEventArgs e)
@@ -949,8 +1013,10 @@ public partial class PicketWindow : Window
         LogDropDecision(e, "drop");
         if (WindowInterop.GetCursorPos(out var cursor)) _dropImage.Drop(e.Data, cursor, e.Effects);
         else _dropImage.Leave();
-        // Titles keep the preview visible but are not new drop destinations.
-        if (e.Effects == DragDropEffects.None) e.Handled = true;
+        ClearDropFeedback();
+        // Complete a valid drop here, before item controls or a reflow can change the route.
+        if (e.Effects != DragDropEffects.None) ItemsHost_Drop(sender, e);
+        e.Handled = true;
     }
 
     private void LogDropDecision(DragEventArgs e, string phase)
@@ -978,14 +1044,9 @@ public partial class PicketWindow : Window
             : null;
         if (internalPayload is PicketItemDragPayload payload)
         {
-            if (payload.Source != this && !Items.Any(it =>
-                    string.Equals(it.Path, payload.Item.Path, StringComparison.OrdinalIgnoreCase)))
-            {
-                payload.Source.Items.Remove(payload.Item);
-                payload.Item.IsSelected = false;
-                Items.Add(payload.Item);
-            }
-            e.Effects = DragDropEffects.Move;
+            var moved = payload.Source.TransferReferences(payload.Items, this);
+            foreach (var item in moved) item.IsSelected = true;
+            e.Effects = moved.Length > 0 ? DragDropEffects.Move : DragDropEffects.None;
             e.Handled = true;
             return;
         }
@@ -1005,6 +1066,7 @@ public partial class PicketWindow : Window
     private Point? _itemDragStart;
     private FrameworkElement? _itemDragSource;
     private PicketItem? _itemDragItem;
+    private bool _deferItemSelection;
 
     private void Item_MouseDown(object sender, MouseButtonEventArgs e)
     {
@@ -1021,6 +1083,8 @@ public partial class PicketWindow : Window
         _itemDragStart = e.GetPosition(this);
         _itemDragSource = fe;
         _itemDragItem = item;
+        _deferItemSelection = item.IsSelected && ItemsHost.SelectedItems.Count > 1 && Keyboard.Modifiers == ModifierKeys.None;
+        if (_deferItemSelection) e.Handled = true; // Keep the whole selection until click versus drag is known.
     }
 
     private void Item_MouseMove(object sender, MouseEventArgs e)
@@ -1035,17 +1099,19 @@ public partial class PicketWindow : Window
 
         var source = _itemDragSource;
         var item = _itemDragItem;
+        var dragged = ActionItems(item);
         ResetItemDragCandidate();
-
-        if (item.Kind != ItemKind.File) return;
+        // ListBox captures the mouse for selection. OLE owns it during a reference drag.
+        if (IsMouseCaptureWithin) Mouse.Capture(null);
 
         var data = new DataObject();
-        data.SetData(PicketItemDragFormat, new PicketItemDragPayload(this, item));
+        data.SetData(PicketItemDragFormat, new PicketItemDragPayload(this, item) { Items = dragged });
         // Captured desktop items already live in the Desktop folder. Advertising FileDrop makes
         // Explorer attempt a same-folder move and display "source and destination are the same".
         // Keep all reference drags private: never ask Explorer to copy or move the original.
 
         var canceled = false;
+        var dropResult = DragDropEffects.None;
         QueryContinueDragEventHandler cancelTracker = (_, args) =>
         {
             if (args.EscapePressed) canceled = true;
@@ -1055,42 +1121,54 @@ public partial class PicketWindow : Window
         try
         {
             var dpi = VisualTreeHelper.GetDpi(this);
-            var preview = DragPreview.Render(item, dpi);
+            var preview = DragPreview.Render(item, dpi, dragged.Length);
             using var dragImage = ShellDragImage.CreateSource(data, preview,
                 new POINT(preview.PixelWidth / 2, (int)(item.IconSize * dpi.DpiScaleY / 2)));
-            DragDrop.DoDragDrop(source, data,
+            dropResult = DragDrop.DoDragDrop(source, data,
                 DragDropEffects.Copy | DragDropEffects.Move | DragDropEffects.Link);
         }
         finally
         {
             source.QueryContinueDrag -= cancelTracker;
             if (Application.Current is App app)
-                foreach (var picket in app.Pickets) picket._dropImage.Leave();
+                foreach (var picket in app.Pickets) picket.ClearDropFeedback();
         }
 
         // A drop onto the desktop can report None because the filesystem item already lives there.
         // Cursor location, plus explicit Escape tracking, tells that valid gesture from cancellation.
-        if (canceled || !item.OriginalDesktopPos.HasValue || !Items.Contains(item) ||
+        // An accepted partial transfer may leave duplicate references in the source. Never
+        // release those to the desktop if automatic sizing moved the target away from the cursor.
+        if (canceled || dropResult != DragDropEffects.None ||
             !WindowInterop.GetCursorPos(out var cursor) || IsPointInsideAnyPicket(cursor)) return;
-
-        if (item.OriginalDesktopPos.HasValue)
+        var released = new List<RemovedReference>();
+        var candidates = SnapshotReferences(dragged.Where(i => i.OriginalDesktopPos.HasValue));
+        foreach (var saved in candidates)
         {
-            var dropPosition = new POINT(cursor.X - 32, cursor.Y - 32);
-            if (!DesktopIconHider.Restore(item.Path, dropPosition) &&
-                !DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value)) return;
+            // Restore a batch to its known desktop positions rather than scattering later items
+            // beyond a monitor edge. A single icon still follows the drop point.
+            var dropPosition = candidates.Length > 1 ? saved.Position!.Value : new POINT(cursor.X - 32, cursor.Y - 32);
+            if (!DesktopIconHider.Restore(saved.Item.Path, dropPosition) &&
+                !DesktopIconHider.Restore(saved.Item.Path, saved.Position!.Value)) continue;
+            saved.Item.OriginalDesktopPos = null;
+            Items.Remove(saved.Item);
+            released.Add(saved);
         }
-        Items.Remove(item);
+        RecordReferenceRemoval(released.ToArray());
         e.Handled = true;
     }
 
     private void Item_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        => ResetItemDragCandidate();
+    {
+        if (_deferItemSelection && _itemDragItem != null) ItemsHost.SelectedItem = _itemDragItem;
+        ResetItemDragCandidate();
+    }
 
     private void ResetItemDragCandidate()
     {
         _itemDragStart = null;
         _itemDragSource = null;
         _itemDragItem = null;
+        _deferItemSelection = false;
     }
 
     private static bool IsPointInsideAnyPicket(POINT point)
@@ -1182,8 +1260,7 @@ public partial class PicketWindow : Window
     {
         if (sender is MenuItem mi && mi.DataContext is PicketItem item)
         {
-            foreach (var selected in ActionItems(item).Where(i => i.Kind == ItemKind.File)) selected.IsLarge = mi.IsChecked;
-            RaiseLayoutChanged();
+            SetIconSizes(ActionItems(item), mi.IsChecked);
         }
     }
 
@@ -1202,7 +1279,9 @@ public partial class PicketWindow : Window
     {
         var text = InputDialog.Show(this, "Section label", "Label text:", "Section");
         if (string.IsNullOrWhiteSpace(text)) return;
-        Items.Add(PicketItem.CreateLabel(text.Trim()));
+        var label = PicketItem.CreateLabel(text.Trim());
+        Items.Add(label);
+        RecordReferenceAddition([label]);
     }
 
     private void ItemMenu_InsertLabelAbove_Click(object sender, RoutedEventArgs e)
@@ -1212,7 +1291,9 @@ public partial class PicketWindow : Window
         if (string.IsNullOrWhiteSpace(text)) return;
         var idx = Items.IndexOf(clicked);
         if (idx < 0) idx = Items.Count;
-        Items.Insert(idx, PicketItem.CreateLabel(text.Trim()));
+        var label = PicketItem.CreateLabel(text.Trim());
+        Items.Insert(idx, label);
+        RecordReferenceAddition([label]);
     }
 
     private void LabelMenu_Rename_Click(object sender, RoutedEventArgs e)
