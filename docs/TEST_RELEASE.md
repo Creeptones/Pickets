@@ -19,6 +19,13 @@ Build: use `release/Pickets.exe` and `release/PicketsSetup.exe` from this checko
 
 - [ ] **Capture and return.** Drag **Pickets test** into a picket, then remove it.
       **Pass:** its desktop icon returns; the shortcut still opens its original target.
+- [ ] **Visible drags.** Slowly drag **Pickets test** from the desktop across a title and into an
+      expanded body; keep holding and move back out, then press Escape. Repeat by dragging a
+      captured test icon between pickets and back to the desktop. Try an ordinary non-desktop
+      reference too, cancelling with Escape. If available, repeat across displays with different scaling.
+      **Pass:** the preview follows the pointer across boundaries and disappears on drop/Escape;
+      titles indicate a blocked drop; reference transfers and desktop restoration still work;
+      ordinary originals are never moved/copied and cancellation leaves membership intact.
 - [ ] **Hide and return.** Capture it again. Press **Alt+F4**, then **Ctrl+Alt+D**.
       **Pass:** Pickets hides, returns, and still contains the shortcut.
 - [ ] **Quit and relaunch.** Choose **Quit Pickets**, then launch the candidate again.

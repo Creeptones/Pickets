@@ -34,6 +34,9 @@ Set the publication date when those checks pass and the release is published.
 
 ### Changed
 
+- Explorer drag images remain visible over picket bodies and titles. Drags started inside
+  Pickets carry a DPI-scaled icon/name preview, including between pickets and back to the desktop.
+  Preview cleanup covers leaving, dropping, cancellation, hiding, and window closure.
 - Title clicks and keyboard expansion requests redirect an in-progress stack animation from
   its current geometry; rapid clicks are no longer discarded. Each title click toggles once,
   including both clicks of a double-click.

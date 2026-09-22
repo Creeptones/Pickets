@@ -10,6 +10,11 @@
         MinWidth="160" MinHeight="32"
         Title="Picket"
         UseLayoutRounding="True"
+        AllowDrop="True"
+        PreviewDragEnter="Picket_DragOver"
+        PreviewDragOver="Picket_DragOver"
+        PreviewDragLeave="Picket_DragLeave"
+        PreviewDrop="Picket_PreviewDrop"
         PreviewKeyDown="Window_PreviewKeyDown"
         FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSizeKey}}">
     <Window.Resources>
@@ -225,7 +230,6 @@
                               VerticalScrollBarVisibility="Auto"
                               AllowDrop="True"
                               Drop="ItemsHost_Drop"
-                              DragOver="ItemsHost_DragOver"
                               Background="Transparent"
                               MouseLeftButtonDown="BodyScroll_MouseLeftButtonDown">
                     <Grid>

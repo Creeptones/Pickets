@@ -14,6 +14,8 @@ using System.Windows.Media;
 
 namespace Pickets;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
+    Justification = "WPF owns the window lifetime; the drag-image helper is disposed in Closed.")]
 public partial class PicketWindow : Window
 {
     public string PicketId { get; }
@@ -118,8 +120,10 @@ public partial class PicketWindow : Window
         Closed += (_, _) =>
         {
             _finishRollAnimation?.Invoke();
+            _dropImage.Dispose();
             SystemParameters.StaticPropertyChanged -= AccessibilitySettingsChanged;
         };
+        IsVisibleChanged += (_, _) => { if (!IsVisible) _dropImage.Leave(); };
     }
 
     public PicketState ToState() => new()
@@ -896,29 +900,34 @@ public partial class PicketWindow : Window
     private const string PicketItemDragFormat = "Pickets.PicketItemDrag";
     private sealed record PicketItemDragPayload(PicketWindow Source, PicketItem Item);
 
-    private bool _loggedFirstDragOver;
-    private void ItemsHost_DragOver(object sender, DragEventArgs e)
+    private readonly ShellDragImage _dropImage = new();
+
+    private DragDropEffects GetDropEffect(DragEventArgs e)
     {
-        if (!_loggedFirstDragOver)
-        {
-            _loggedFirstDragOver = true;
-            Logger.Log($"ItemsHost_DragOver first hit. blur={_blurEnabled} " +
-                       $"hasFileDrop={e.Data.GetDataPresent(DataFormats.FileDrop)}");
-        }
-        if (e.Data.GetDataPresent(PicketItemDragFormat))
-        {
-            e.Effects = DragDropEffects.Move;
-            e.Handled = true;
-            return;
-        }
-        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
-        {
-            e.Effects = DragDropEffects.None;
-            e.Handled = true;
-            return;
-        }
-        e.Effects = DragDropEffects.Link;
+        var position = e.GetPosition(BodyScroll);
+        var overBody = BodyScroll.IsVisible && position.X >= 0 && position.Y >= 0 &&
+            position.X < BodyScroll.ActualWidth && position.Y < BodyScroll.ActualHeight;
+        return DragPreview.DropEffect(overBody, e.Data.GetDataPresent(PicketItemDragFormat),
+            e.Data.GetDataPresent(DataFormats.FileDrop), e.AllowedEffects);
+    }
+
+    private void Picket_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = GetDropEffect(e);
+        if (WindowInterop.GetCursorPos(out var cursor))
+            _dropImage.Over(new WindowInteropHelper(this).Handle, e.Data, cursor, e.Effects);
         e.Handled = true;
+    }
+
+    private void Picket_DragLeave(object sender, DragEventArgs e) => _dropImage.Leave();
+
+    private void Picket_PreviewDrop(object sender, DragEventArgs e)
+    {
+        e.Effects = GetDropEffect(e);
+        if (WindowInterop.GetCursorPos(out var cursor)) _dropImage.Drop(e.Data, cursor, e.Effects);
+        else _dropImage.Leave();
+        // Titles keep the preview visible but are not new drop destinations.
+        if (e.Effects == DragDropEffects.None) e.Handled = true;
     }
 
     private void ItemsHost_Drop(object sender, DragEventArgs e)
@@ -1008,12 +1017,18 @@ public partial class PicketWindow : Window
         source.QueryContinueDrag += cancelTracker;
         try
         {
+            var dpi = VisualTreeHelper.GetDpi(this);
+            var preview = DragPreview.Render(item, dpi);
+            using var dragImage = ShellDragImage.CreateSource(data, preview,
+                new POINT(preview.PixelWidth / 2, (int)(item.IconSize * dpi.DpiScaleY / 2)));
             DragDrop.DoDragDrop(source, data,
                 DragDropEffects.Copy | DragDropEffects.Move | DragDropEffects.Link);
         }
         finally
         {
             source.QueryContinueDrag -= cancelTracker;
+            if (Application.Current is App app)
+                foreach (var picket in app.Pickets) picket._dropImage.Leave();
         }
 
         // A drop onto the desktop can report None because the filesystem item already lives there.

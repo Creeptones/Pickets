@@ -124,3 +124,15 @@ Escape cancellation. Both clicks of a double-click now count as separate toggles
 115 tests passed, including deterministic mid-animation reversal/switching on real unshown WPF
 windows and gesture cases at 100%, 125%, 150%, and 200% scaling. Live mouse/capture, keyboard,
 and reduced-motion checks remain in the short test list.
+
+### Drag-image continuity (2026-09-22)
+
+The Windows drag-image helper receives enter/over/leave/drop events across the whole picket window,
+including non-droppable titles. Internal reference drags supply an icon/name bitmap scaled for the
+source display. FileDrop is still absent from internal drags, and external drops advertise Link
+or Copy rather than a filesystem Move. The source and target helpers release their resources when
+the drag ends or is cancelled and when the window closes.
+125 tests passed, including native Shell helper initialization and COM data round-tripping through
+enter/over/leave/drop/disposal, payload preservation, effect filtering, and 100–200% preview renders.
+The rendered previews were inspected. Live Explorer, cancellation, desktop restoration, and
+mixed-DPI dragging still require the short test-list pass.

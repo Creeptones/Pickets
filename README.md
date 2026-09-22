@@ -174,6 +174,9 @@ instructions in its tooltip and accessibility help.
 Dragging between pickets transfers a reference. Dragging a captured icon out restores its desktop
 presentation. Other reference drags remain inside Pickets; they never ask Explorer to move or copy
 the source. **Remove from picket** removes only the reference (and restores a captured desktop icon).
+Drag previews stay visible across picket boundaries: incoming Explorer drags retain their Windows
+preview, and drags started in Pickets show the icon and name. Drop into an expanded body; titles
+show a blocked-drop cursor. Escape cancels the drag and removes its preview.
 
 ### Keyboard and accessibility
 
