@@ -37,7 +37,6 @@ public class PicketItem : INotifyPropertyChanged
             _isLarge = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(CellWidth));
-            OnPropertyChanged(nameof(CellHeight));
             OnPropertyChanged(nameof(IconSize));
         }
     }
@@ -97,8 +96,7 @@ public class PicketItem : INotifyPropertyChanged
         }
     }
 
-    public double CellWidth  => IsLarge ? 168 : 84;
-    public double CellHeight => (IsLarge ? 168 : 100) + (string.IsNullOrEmpty(StatusText) ? 0 : 32);
+    public double CellWidth  => IsLarge ? 128 : 96;
     public double IconSize   => IsLarge ? 96 : 40;
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -132,7 +130,6 @@ public class PicketItem : INotifyPropertyChanged
         OnPropertyChanged(nameof(ReferenceHelp));
         OnPropertyChanged(nameof(IsMissing));
         OnPropertyChanged(nameof(AccessibleName));
-        OnPropertyChanged(nameof(CellHeight));
     }
 
     private Task? _refreshTask;

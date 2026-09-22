@@ -48,6 +48,12 @@ Build: use `release/Pickets.exe` and `release/PicketsSetup.exe` from this checko
 
 **Round 2 — the recovery blocker. About 10 minutes**
 
+- [ ] **Compact rows.** Open a short section and one containing more than two rows of icons.
+      **Pass:** the short section fits one row; the larger section shows two complete rows and
+      scrolls to the rest. Labels remain readable and connected titles remain attached. Add/remove
+      a reference across the one/two-row boundary, then restart; the sizing follows the contents.
+      Repeat with large icons. A deliberate vertical resize should retain the chosen manual height.
+
 - [ ] **Monitor round-trip.** With two displays connected (A), capture **Pickets test**. Disconnect
       one display (B), and remove the test reference from B if it is present. Reconnect (A), then
       disconnect again (B). Choose **Quit Pickets**.

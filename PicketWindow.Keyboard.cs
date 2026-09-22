@@ -102,7 +102,12 @@ public partial class PicketWindow
             if (ctrl)
             {
                 var width = Math.Max(MinWidth, group[0].Width + dx);
-                foreach (var member in group) member._expandedHeight = Math.Max(96, member._expandedHeight + dy);
+                foreach (var member in group)
+                {
+                    if (dy != 0) member._autoSizeRows = false;
+                    member._expandedHeight = member._autoSizeRows ? member.MeasureContentHeight(width)
+                        : Math.Max(96, member._expandedHeight + dy);
+                }
                 ApplyGroupBounds(group, width, group[0]._expandedHeight);
             }
             else

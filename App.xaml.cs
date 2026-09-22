@@ -421,6 +421,7 @@ public partial class App : Application
             Y = rect.top,
             Width = Math.Max(240, width),
             Height = Math.Max(180, height),
+            AutoSizeRows = false, // The lasso explicitly chooses a rectangle.
             ColorKey = PicketColors.Get(_layout.DefaultColorKey).Key,
         };
 
@@ -554,7 +555,7 @@ public partial class App : Application
         {
             Title = "New picket",
             X = x, Y = y,
-            Width = 320, Height = 240,
+            Width = 320, Height = PicketContentSizing.EmptyHeight, AutoSizeRows = true,
             ColorKey = PicketColors.Get(_layout.DefaultColorKey).Key,
         };
         var picket = SpawnPicket(state);

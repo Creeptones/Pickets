@@ -103,6 +103,7 @@ public partial class PicketWindow
         _groupHorizontal = first._groupHorizontal;
         _accordionMode = first._accordionMode;
         _expandedHeight = first._expandedHeight;
+        _autoSizeRows = first._autoSizeRows;
         _stackPageIndex = first._stackPageIndex;
         Width = first.Width;
         NeedsGroupMigration = false;
@@ -169,7 +170,8 @@ public partial class PicketWindow
         {
             var p = group[i];
             p.GroupOrder = i;
-            p._expandedHeight = expanded;
+            p._autoSizeRows = first._autoSizeRows;
+            p._expandedHeight = p._autoSizeRows ? p.MeasureContentHeight(width) : expanded;
             p._groupHorizontal = first._groupHorizontal;
             p._accordionMode = first._accordionMode;
             if (first._accordionMode && p != open) p._isCollapsed = true;
@@ -199,7 +201,8 @@ public partial class PicketWindow
         var visible = group.Skip(page.Start).Take(page.Length).ToList();
         var dpi = VisualTreeHelper.GetDpi(first);
         var bounds = StackLayout.Arrange(new Point(first.Left, first.Top), width, expandedHeight,
-            visible.Select(p => p._isCollapsed).ToList(), first._groupHorizontal, work, dpi.DpiScaleX, dpi.DpiScaleY);
+            visible.Select(p => p._isCollapsed).ToList(), first._groupHorizontal, work, dpi.DpiScaleX, dpi.DpiScaleY,
+            visible.Select(p => p._expandedHeight).ToArray());
         for (var i = 0; i < group.Count; i++)
         {
             var onPage = page.Contains(i);
@@ -207,7 +210,7 @@ public partial class PicketWindow
             group[i].Left = rect.Left;
             group[i].Top = rect.Top;
             group[i].Width = rect.Width;
-            group[i].Height = onPage ? rect.Height : group[i]._isCollapsed ? StackLayout.TitleHeight : expandedHeight;
+            group[i].Height = onPage ? rect.Height : group[i]._isCollapsed ? StackLayout.TitleHeight : group[i]._expandedHeight;
             group[i].UpdateStackPageControls(page, onPage);
         }
     }
@@ -275,7 +278,8 @@ public partial class PicketWindow
         var first = group[0];
         var dpi = VisualTreeHelper.GetDpi(first);
         var target = StackLayout.Arrange(anchor, first.Width, first._expandedHeight,
-            states, _groupHorizontal, first.GroupWorkArea(), dpi.DpiScaleX, dpi.DpiScaleY);
+            states, _groupHorizontal, first.GroupWorkArea(), dpi.DpiScaleX, dpi.DpiScaleY,
+            group.Select(p => p._expandedHeight).ToArray());
         for (var i = 0; i < group.Count; i++)
         {
             group[i]._isRollAnimating = true;
@@ -314,6 +318,7 @@ public partial class PicketWindow
             // No intermediate position/size notifications: persist and refresh the final stack once.
             Cancel();
             RaiseLayoutChanged();
+            foreach (var p in group) p.QueueContentSizing();
         }
         _finishRollAnimation = Finish;
         _cancelRollAnimation = Cancel;

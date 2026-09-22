@@ -53,6 +53,8 @@ public class PicketState
     public double Y { get; set; } = 200;
     public double Width { get; set; } = 420;
     public double Height { get; set; } = 320;
+    // Older layouts adopt compact rows; a subsequent manual height resize persists false.
+    public bool AutoSizeRows { get; set; } = true;
     public bool IsCollapsed { get; set; }
     // Null means an older layout whose touching groups still need a one-time migration.
     public string? GroupId { get; set; }
@@ -286,7 +288,7 @@ public static class LayoutStore
 
         var fresh = seed != null
             ? seed.Select(CloneWithNewId).ToList()
-            : new List<PicketState> { new PicketState { Title = "Picket", X = 200, Y = 200, Width = 420, Height = 320 } };
+            : new List<PicketState> { new PicketState { Title = "Picket", X = 200, Y = 200, Width = 420, Height = PicketContentSizing.EmptyHeight, AutoSizeRows = true } };
 
         foreach (var s in fresh)
             DisplayProfile.ClampToVisibleWorkArea(s);
@@ -304,6 +306,7 @@ public static class LayoutStore
         Title = src.Title,
         X = src.X, Y = src.Y,
         Width = src.Width, Height = src.Height,
+        AutoSizeRows = src.AutoSizeRows,
         IsCollapsed = src.IsCollapsed,
         GroupId = src.GroupId,
         GroupOrder = src.GroupOrder,
@@ -375,7 +378,7 @@ public static class LayoutStore
     {
         var seed = new List<PicketState>
         {
-            new PicketState { Title = "Picket", X = 200, Y = 200, Width = 420, Height = 320 }
+            new PicketState { Title = "Picket", X = 200, Y = 200, Width = 420, Height = PicketContentSizing.EmptyHeight, AutoSizeRows = true }
         };
         return new LayoutFile { LastProfileSeed = seed };
     }

@@ -129,14 +129,17 @@ The title chevron indicates expansion, **⋯** opens the menu, and the outside c
 hint on hover or keyboard focus.
 
 Rolled-up pickets remain visible as a tidy stack of titles. Pickets snap to screen edges and one
-another, and connected groups stay flush, share one size, and move or resize as a single outer
+another, and connected groups stay flush, share one width, and move or resize as a single outer
 frame. Internal edges between connected pickets are not resize handles. The title menu also provides eight
 coordinated color systems, transparency levels, optional background blur, section labels, and
-large icons.
+large icons. New and existing pickets fit their contents up to two icon rows, with scrolling for
+more references. Short groups use one row; labels remain compact. Names use up to two lines, with
+the full reference available in the tooltip. Manually resizing the height overrides automatic
+sizing for the connected stack; resizing only its width keeps automatic sizing.
 
 Connected groups form a row or a column. Joining pickets into an irregular arrangement, such as an
-L-shape or grid, settles the group into one consistently sized vertical stack. Membership, order,
-shared dimensions, and collapsed state are saved across restarts and display profiles. Use **Stack → Detach picket** to detach one; merely moving the group does not break it apart.
+L-shape or grid, settles the group into one vertical stack. Membership, order,
+sizing, and collapsed state are saved across restarts and display profiles. Use **Stack → Detach picket** to detach one; merely moving the group does not break it apart.
 
 ### Optional accordion stacks
 

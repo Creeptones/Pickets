@@ -148,3 +148,15 @@ The trace confirms Link acceptance for incoming files over the grid, item border
 and label text. The user then passed three collapse/reopen cycles followed by another drag into
 Programs. The issue did not recur in that check; its root cause remains unconfirmed. Retain the
 drop trace and investigate if it recurs during normal use.
+
+### Compact content sizing (2026-09-22)
+
+New and existing saved pickets default to one or two measured icon rows, with additional icons
+scrolling. Labels occupy compact rows between icon rows. Connected members share width while
+retaining individual content heights; work-area constraints can reduce visible body space.
+Manual vertical resizing persists an override. The full Release suite passed 130 tests,
+including actual WPF row bounds with normal/large icons and 12/22-point text, shrinking after
+removal, saved-profile defaults/overrides, and mixed-height stack seams at 100–200% DPI.
+The rendered normal and large-text layouts were inspected. The user passed the live check of
+two complete rows and scrolling to additional icons in Ephemera Development. The other release
+matrix checks remain tracked in `TEST_RELEASE.md`.

@@ -48,7 +48,7 @@ public sealed class AccessibilityTests
                 {
                     Title = new[] { "Development", "Music", "Documents" }[i],
                     GroupId = "test-stack", GroupOrder = i, AccordionMode = true,
-                    IsCollapsed = i != 1, Width = 340, Height = 280,
+                    IsCollapsed = i != 1, Width = 340, Height = 280, AutoSizeRows = false,
                     X = 30, Y = 30 + i * 32,
                     Items = [new ItemState { Path = @"Z:\Offline\Mixdown.wav" }, new ItemState { Kind = ItemKind.Label, LabelText = "Projects" }]
                 });
@@ -129,6 +129,7 @@ public sealed class AccessibilityTests
             CheckStackMembershipChanges(app, windows);
             CheckStackRetargeting(app, windows);
             CheckLabelBodyDropRouting(app, windows);
+            CheckCompactRows(app, windows);
             CheckReleasePolish(app, windows);
         }
         finally
@@ -137,6 +138,77 @@ public sealed class AccessibilityTests
             app.Frames.Dispose();
             // Do not call App.Shutdown: normal OnExit persists the user's real layout.
             Dispatcher.CurrentDispatcher.InvokeShutdown();
+        }
+    }
+
+    private static void CheckCompactRows(App app, List<PicketWindow> windows)
+    {
+        foreach (var large in new[] { false, true })
+        foreach (var font in new[] { 12.0, 22.0 })
+        {
+            var width = 18 + 3 * (PicketContentSizing.CellWidth(large, font) + 6) + SystemParameters.VerticalScrollBarWidth;
+            var window = new PicketWindow(new PicketState { Title = "Compact rows", Width = width, AutoSizeRows = true })
+                { FontSize = font };
+            windows.Add(window);
+            ((IList<PicketWindow>)app.Pickets).Add(window);
+            for (var i = 0; i < 7; i++)
+            {
+                if (i == 3) window.Items.Add(PicketItem.CreateLabel("Section label"));
+                window.Items.Add(new PicketItem { DisplayName = "Example reference " + i, IsLarge = large });
+            }
+            window.NormalizeConnectedGroup();
+            var content = window.Content;
+            window.Content = null;
+            var host = new Window { Content = content, Left = -32000, Top = -32000,
+                Width = width, Height = window.Height, FontSize = font,
+                ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
+                AllowsTransparency = true, Background = Brushes.Transparent };
+            host.Show();
+            host.UpdateLayout();
+            try
+            {
+                var frame = DateTime.UtcNow.Ticks;
+                void SettleContent()
+                {
+                    for (var pass = 0; pass < 4; pass++)
+                    {
+                        host.UpdateLayout();
+                        app.Frames.ProcessFrame(TimeSpan.FromTicks(++frame));
+                        host.Height = window.Height;
+                    }
+                    host.UpdateLayout();
+                }
+                SettleContent();
+                var body = (ScrollViewer)window.FindName("BodyScroll");
+                var list = (ListBox)window.FindName("ItemsHost");
+                var sixth = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(6);
+                var seventh = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(7);
+                Capture((FrameworkElement)content, $"compact-rows-{large}-{font}.png", width, window.Height);
+                Assert.True(sixth.TranslatePoint(new Point(0, sixth.ActualHeight), body).Y <= body.ActualHeight - 3,
+                    $"Second row clipped: large={large}, font={font}, bottom={sixth.TranslatePoint(new Point(0, sixth.ActualHeight), body).Y}, body={body.ActualHeight}, viewportWidth={body.ViewportWidth}, listWidth={list.ActualWidth}, cell={sixth.DesiredSize}, dpi={VisualTreeHelper.GetDpi(body).DpiScaleX}");
+                Assert.True(seventh.TranslatePoint(new Point(0, 10), body).Y >= body.ActualHeight - 4,
+                    "Third icon row should require scrolling.");
+                Assert.True(body.ScrollableHeight > 0);
+                Capture((FrameworkElement)content, $"compact-rows-{large}-{font}.png", width, window.Height);
+                var twoRows = window.ToState().Height;
+                while (window.Items.Count > 3) window.Items.RemoveAt(window.Items.Count - 1);
+                SettleContent();
+                Assert.True(window.ToState().Height < twoRows);
+                Assert.True(window.ToState().AutoSizeRows);
+                var checkingHeight = window.ToState().Height;
+                foreach (var item in window.Items) item.IsMissing = false;
+                SettleContent();
+                Assert.True(window.ToState().Height < checkingHeight, "Available references should not reserve empty status space.");
+            }
+            finally
+            {
+                host.Content = null;
+                host.Close();
+                window.Content = content;
+                window.CloseForLayoutChange();
+                ((IList<PicketWindow>)app.Pickets).Remove(window);
+                windows.Remove(window);
+            }
         }
     }
 
@@ -155,7 +227,8 @@ public sealed class AccessibilityTests
         var content = window.Content;
         window.Content = null;
         var host = new Window { Content = content, Left = -32000, Top = -32000, Width = 788, Height = 260,
-            ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
+            ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
+            AllowsTransparency = true, Background = Brushes.Transparent };
         host.Show();
         host.UpdateLayout();
         try
@@ -203,7 +276,7 @@ public sealed class AccessibilityTests
                 var member = new PicketWindow(new PicketState
                 {
                     Title = "Retarget " + i, GroupId = "retarget", GroupOrder = i,
-                    GroupHorizontal = horizontal, AccordionMode = accordion,
+                    GroupHorizontal = horizontal, AccordionMode = accordion, AutoSizeRows = false,
                     IsCollapsed = i != 0, Width = 200, Height = 160, X = 30, Y = 30 + i * 32
                 });
                 members.Add(member);
@@ -291,7 +364,7 @@ public sealed class AccessibilityTests
                 var member = new PicketWindow(new PicketState
                 {
                     Title = "Membership " + i, GroupId = id, GroupOrder = i,
-                    GroupHorizontal = horizontal, AccordionMode = accordion,
+                    GroupHorizontal = horizontal, AccordionMode = accordion, AutoSizeRows = false,
                     IsCollapsed = i != 0, Width = 200, Height = 160, X = 30, Y = 30 + i * 32
                 });
                 members.Add(member);

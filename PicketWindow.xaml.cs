@@ -72,6 +72,7 @@ public partial class PicketWindow : Window
         TitleToggle.SetExpanded = SetExpanded;
         UpdateAccessibleTitle();
         _expandedHeight = state.Height;
+        _autoSizeRows = state.AutoSizeRows;
 
         _colorKey = PicketColors.Get(state.ColorKey).Key;
         _transparencyKey = state.TransparencyKey;
@@ -113,7 +114,13 @@ public partial class PicketWindow : Window
         if (state.IsCollapsed)
             ApplyCollapseState(true);
 
-        Items.CollectionChanged += (_, _) => RaiseLayoutChanged();
+        WatchContentItems();
+        Items.CollectionChanged += (_, _) =>
+        {
+            WatchContentItems();
+            RaiseLayoutChanged();
+            QueueContentSizing();
+        };
         _suppressSliderEvent = false;
         UpdateExpansionControls();
         SystemParameters.StaticPropertyChanged += AccessibilitySettingsChanged;
@@ -121,6 +128,7 @@ public partial class PicketWindow : Window
         {
             _finishRollAnimation?.Invoke();
             _dropImage.Dispose();
+            StopWatchingContentItems();
             SystemParameters.StaticPropertyChanged -= AccessibilitySettingsChanged;
         };
         IsVisibleChanged += (_, _) => { if (!IsVisible) _dropImage.Leave(); };
@@ -133,6 +141,7 @@ public partial class PicketWindow : Window
         X = Left, Y = Top,
         Width = Width,
         Height = _expandedHeight,
+        AutoSizeRows = _autoSizeRows,
         IsCollapsed = _isCollapsed,
         GroupId = GroupId,
         GroupOrder = GroupOrder,
@@ -310,6 +319,7 @@ public partial class PicketWindow : Window
     {
         base.OnRenderSizeChanged(sizeInfo);
         RaiseLayoutChanged();
+        if (sizeInfo.WidthChanged) QueueContentSizing();
     }
 
     private void RaiseLayoutChanged()
@@ -846,7 +856,7 @@ public partial class PicketWindow : Window
     }
 
     // === Resize thumbs ===
-    // A connected cluster has one size and resizes as a unit. Reflowing after every delta keeps
+    // A connected cluster resizes as a unit. Reflowing after every delta keeps
     // adjacent members flush instead of allowing a height/width change to create gaps or overlaps.
     private List<PicketWindow>? _resizeCluster;
     private GroupOrientation _resizeOrientation;
@@ -863,6 +873,7 @@ public partial class PicketWindow : Window
     {
         _resizeCluster = null;
         RaiseLayoutChanged();
+        QueueContentSizing();
     }
 
     private void ResizeCluster(double horizontalChange, double verticalChange)
@@ -874,7 +885,11 @@ public partial class PicketWindow : Window
             ? Math.Max(1, _resizeCluster.Count(p => p.IsOnStackPage && !p._isCollapsed)) : 1;
         var width = Math.Max(Width + horizontalChange / widthDivisor, _resizeCluster.Max(p => p.MinWidth));
         var height = Math.Max(_expandedHeight + verticalChange / heightDivisor, 96);
-        foreach (var p in _resizeCluster) p._expandedHeight = height;
+        foreach (var p in _resizeCluster)
+        {
+            if (verticalChange != 0) p._autoSizeRows = false;
+            p._expandedHeight = p._autoSizeRows ? p.MeasureContentHeight(width) : height;
+        }
         ApplyGroupBounds(OrderResizeCluster(), width, height);
     }
 

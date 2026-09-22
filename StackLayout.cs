@@ -19,18 +19,19 @@ internal static class StackLayout
     }
 
     internal static IReadOnlyList<Rect> Arrange(Point origin, double width, double expandedHeight,
-        IReadOnlyList<bool> collapsed, bool horizontal, Rect work, double scaleX = 1, double scaleY = 1)
+        IReadOnlyList<bool> collapsed, bool horizontal, Rect work, double scaleX = 1, double scaleY = 1,
+        IReadOnlyList<double>? expandedHeights = null)
     {
         if (collapsed.Count == 0) return Array.Empty<Rect>();
         width = Math.Max(1, Math.Min(width, horizontal ? work.Width / collapsed.Count : work.Width));
         width = Math.Floor(width * scaleX) / scaleX;
         var title = Math.Ceiling(TitleHeight * scaleY) / scaleY;
-        var openCount = collapsed.Count(c => !c);
-        var availableHeight = horizontal ? work.Height
-            : openCount == 0 ? title : (work.Height - (collapsed.Count - openCount) * title) / openCount;
-        var height = Math.Max(title, Math.Min(expandedHeight, availableHeight));
-        height = Math.Floor(height * scaleY) / scaleY;
-        var heights = collapsed.Select(c => c ? title : height).ToArray();
+        var desired = collapsed.Select((c, i) => c ? title : Math.Max(title, expandedHeights?[i] ?? expandedHeight)).ToArray();
+        var bodyTotal = desired.Sum(h => h - title);
+        var bodyBudget = Math.Max(0, work.Height - collapsed.Count * title);
+        var fraction = bodyTotal == 0 ? 1 : Math.Min(1, bodyBudget / bodyTotal);
+        var heights = desired.Select(h => Math.Floor((horizontal ? Math.Min(h, work.Height)
+            : title + (h - title) * fraction) * scaleY) / scaleY).ToArray();
         var totalWidth = horizontal ? width * collapsed.Count : width;
         var totalHeight = horizontal ? heights.Max() : heights.Sum();
         var x = Math.Clamp(origin.X, work.Left, Math.Max(work.Left, work.Right - totalWidth));

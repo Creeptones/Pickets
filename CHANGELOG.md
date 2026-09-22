@@ -34,6 +34,10 @@ Set the publication date when those checks pass and the release is published.
 
 ### Changed
 
+- New and existing pickets automatically fit up to two measured icon rows and scroll additional
+  references. Connected sections retain individual content heights and shared widths. Compact
+  tiles remove empty status space and limit names to two lines; explicit height resizing remains
+  available as a saved override.
 - Explorer drag images remain visible over picket bodies and titles. Drags started inside
   Pickets carry a DPI-scaled icon/name preview, including between pickets and back to the desktop.
   Preview cleanup covers leaving, dropping, cancellation, hiding, and window closure.

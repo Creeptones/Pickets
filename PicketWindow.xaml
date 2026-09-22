@@ -20,6 +20,7 @@
     <Window.Resources>
         <local:PicketCellWidthConverter x:Key="CellWidthConverter"/>
         <local:PicketLabelWidthConverter x:Key="LabelWidthConverter"/>
+        <local:PicketTextHeightConverter x:Key="TextHeightConverter"/>
         <ContextMenu x:Key="ItemContextMenu" DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
             <MenuItem Header="Open" Click="ItemMenu_Open_Click"/>
             <MenuItem Header="Check again" Click="ItemMenu_Check_Click"/>
@@ -228,12 +229,13 @@
                 </Border>
                 <ScrollViewer x:Name="BodyScroll"
                               VerticalScrollBarVisibility="Auto"
+                              Padding="4"
                               AllowDrop="True"
                               Drop="ItemsHost_Drop"
                               Background="Transparent"
                               MouseLeftButtonDown="BodyScroll_MouseLeftButtonDown">
                     <Grid>
-                    <ListBox x:Name="ItemsHost" Margin="4" SelectionMode="Extended" BorderThickness="0" Background="Transparent"
+                    <ListBox x:Name="ItemsHost" SelectionMode="Extended" BorderThickness="0" Padding="0" Background="Transparent"
                         AutomationProperties.Name="Picket references" KeyboardNavigation.TabNavigation="Once"
                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
                         <ListBox.ItemContainerStyle>
@@ -243,6 +245,7 @@
                                 <Setter Property="AutomationProperties.HelpText" Value="{Binding ReferenceHelp}"/>
                                 <Setter Property="ContextMenu" Value="{StaticResource ItemContextMenu}"/>
                                 <Setter Property="Foreground" Value="{DynamicResource PicketItemForeground}"/>
+                                <Setter Property="VerticalAlignment" Value="Top"/>
                                 <EventSetter Event="PreviewMouseLeftButtonDown" Handler="Item_MouseDown"/>
                                 <EventSetter Event="MouseMove" Handler="Item_MouseMove"/>
                                 <EventSetter Event="MouseLeftButtonUp" Handler="Item_MouseLeftButtonUp"/>
@@ -250,7 +253,7 @@
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="Cell" Margin="1" Padding="2" Background="Transparent" BorderBrush="Transparent" BorderThickness="2" CornerRadius="4">
+                                            <Border x:Name="Cell" Margin="1" Padding="1" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="4">
                                                 <ContentPresenter/>
                                             </Border>
                                             <ControlTemplate.Triggers>
@@ -273,7 +276,7 @@
                         </ListBox.ItemContainerStyle>
                         <ListBox.Resources>
                             <DataTemplate x:Key="FileItemTemplate">
-                                <StackPanel MinHeight="{Binding CellHeight}" ToolTip="{Binding ReferenceHelp}"
+                                <StackPanel ToolTip="{Binding ReferenceHelp}"
                                     TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}">
                                     <StackPanel.Width>
                                         <MultiBinding Converter="{StaticResource CellWidthConverter}">
@@ -292,18 +295,31 @@
                                         </TextBlock>
                                         <Image Source="{Binding Icon}"/>
                                     </Grid>
-                                    <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" TextAlignment="Center"/>
-                                    <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" TextAlignment="Center" Margin="1,4,1,0"/>
+                                    <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" TextAlignment="Center"
+                                        LineStackingStrategy="BlockLineHeight"
+                                        LineHeight="{Binding FontSize, RelativeSource={RelativeSource Self}, Converter={StaticResource TextHeightConverter}}"
+                                        MaxHeight="{Binding FontSize, RelativeSource={RelativeSource Self}, Converter={StaticResource TextHeightConverter}, ConverterParameter=2}"/>
+                                    <TextBlock Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" TextAlignment="Center" Margin="1,2,1,0"
+                                        LineStackingStrategy="BlockLineHeight"
+                                        LineHeight="{Binding FontSize, RelativeSource={RelativeSource Self}, Converter={StaticResource TextHeightConverter}}">
+                                        <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers>
+                                            <DataTrigger Binding="{Binding StatusText}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                        </Style.Triggers></Style></TextBlock.Style>
+                                    </TextBlock>
                                 </StackPanel>
                             </DataTemplate>
                             <DataTemplate x:Key="LabelItemTemplate">
-                                <TextBlock Text="{Binding LabelText}" FontWeight="SemiBold" Padding="6,8" TextWrapping="Wrap"
+                                <TextBlock Text="{Binding LabelText}" FontWeight="SemiBold" Padding="6,5" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                                    ToolTip="{Binding LabelText}"
+                                    MaxHeight="{Binding FontSize, RelativeSource={RelativeSource Self}, Converter={StaticResource TextHeightConverter}, ConverterParameter=Label}"
+                                    LineStackingStrategy="BlockLineHeight"
+                                    LineHeight="{Binding FontSize, RelativeSource={RelativeSource Self}, Converter={StaticResource TextHeightConverter}}"
                                     Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                                     Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=WrapPanel}, Converter={StaticResource LabelWidthConverter}}"/>
                             </DataTemplate>
                             <local:PicketItemTemplateSelector x:Key="ItemSelector" FileTemplate="{StaticResource FileItemTemplate}" LabelTemplate="{StaticResource LabelItemTemplate}"/>
                         </ListBox.Resources>
-                        <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>
+                        <ListBox.ItemsPanel><ItemsPanelTemplate><local:PicketItemsPanel RowsMeasured="ContentRowsMeasured"/></ItemsPanelTemplate></ListBox.ItemsPanel>
                         <ListBox.ItemTemplateSelector><StaticResource ResourceKey="ItemSelector"/></ListBox.ItemTemplateSelector>
                     </ListBox>
                     <StackPanel x:Name="EmptyState" Margin="14,18" HorizontalAlignment="Stretch" TextElement.Foreground="{DynamicResource PicketItemForeground}">
