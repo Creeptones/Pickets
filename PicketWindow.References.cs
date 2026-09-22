@@ -10,15 +10,30 @@ namespace Pickets;
 
 public partial class PicketWindow
 {
-    private void MoveReferenceTo(PicketItem item, PicketWindow target)
+    internal PicketItem[] TransferReferences(IEnumerable<PicketItem> items, PicketWindow target)
     {
-        if (!Items.Contains(item) || target.Items.Any(i => string.Equals(i.Path, item.Path, StringComparison.OrdinalIgnoreCase))) return;
-        Items.Remove(item);
-        item.IsSelected = false;
-        target.Items.Add(item);
+        if (target == this) return [];
+        var moved = new List<PicketItem>();
+        foreach (var item in items.ToArray())
+        {
+            if (!Items.Contains(item) || (item.Kind == ItemKind.File && target.Items.Any(i => i.Kind == ItemKind.File &&
+                string.Equals(i.Path, item.Path, StringComparison.OrdinalIgnoreCase)))) continue;
+            Items.Remove(item);
+            item.IsSelected = false;
+            target.Items.Add(item);
+            moved.Add(item);
+        }
+        return moved.ToArray();
+    }
+
+    private void MoveReferencesTo(IEnumerable<PicketItem> items, PicketWindow target)
+    {
+        var moved = TransferReferences(items, target);
+        if (moved.Length == 0) return;
         target.SetExpanded(true);
         target.FocusForKeyboard();
-        target.FocusItem(target.Items.Count - 1);
+        target.FocusItem(target.Items.IndexOf(moved[0]));
+        foreach (var item in moved) item.IsSelected = true;
     }
 
     private void AddFiles_Click(object sender, RoutedEventArgs e) => AddFiles();
@@ -61,7 +76,8 @@ public partial class PicketWindow
 
     private async void ItemMenu_Check_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is MenuItem { DataContext: PicketItem item }) await item.RefreshAsync();
+        if (sender is MenuItem { DataContext: PicketItem item })
+            foreach (var reference in ActionItems(item).Where(i => i.Kind == ItemKind.File)) await reference.RefreshAsync();
     }
 
     private void ItemMenu_Locate_Click(object sender, RoutedEventArgs e)

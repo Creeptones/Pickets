@@ -126,12 +126,13 @@ public partial class PicketWindow : Window
         SystemParameters.StaticPropertyChanged += AccessibilitySettingsChanged;
         Closed += (_, _) =>
         {
+            EndBoxSelection(cancel: true);
             _finishRollAnimation?.Invoke();
             _dropImage.Dispose();
             StopWatchingContentItems();
             SystemParameters.StaticPropertyChanged -= AccessibilitySettingsChanged;
         };
-        IsVisibleChanged += (_, _) => { if (!IsVisible) _dropImage.Leave(); };
+        IsVisibleChanged += (_, _) => { if (!IsVisible) { _dropImage.Leave(); EndBoxSelection(cancel: true); } };
     }
 
     public PicketState ToState() => new()
@@ -1113,21 +1114,31 @@ public partial class PicketWindow : Window
                 i.IsSelected = false;
     }
 
-    // Click on empty picket body (below the last item) clears the current selection, matching
-    // Explorer's behavior.
-    private void BodyScroll_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        ClearSelection();
-    }
-
     private void Item_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         if (sender is FrameworkElement fe && fe.ContextMenu is ContextMenu cm
             && fe.DataContext is PicketItem item)
         {
+            if (!item.IsSelected) ItemsHost.SelectedItem = item;
+            var selected = ActionItems(item);
+            var files = selected.Where(i => i.Kind == ItemKind.File).ToArray();
+            foreach (var entry in cm.Items.OfType<MenuItem>())
+            {
+                entry.Visibility = entry.Tag switch
+                {
+                    "Open" or "Check" or "LargeToggle" => files.Length > 0 ? Visibility.Visible : Visibility.Collapsed,
+                    "Locate" or "Location" => selected.Length == 1 && files.Length == 1 ? Visibility.Visible : Visibility.Collapsed,
+                    "InsertLabel" => selected.Length == 1 ? Visibility.Visible : Visibility.Collapsed,
+                    "RenameLabel" => selected.Length == 1 && files.Length == 0 ? Visibility.Visible : Visibility.Collapsed,
+                    _ => Visibility.Visible
+                };
+                if (Equals(entry.Tag, "Open")) entry.Header = files.Length > 1 ? $"Open {files.Length} references" : "Open";
+                if (Equals(entry.Tag, "Remove")) entry.Header = selected.Length > 1 ? $"Remove {selected.Length} items from picket" : "Remove from picket";
+                if (Equals(entry.Tag, "MoveReferenceTo")) entry.Header = selected.Length > 1 ? $"Move {selected.Length} items to" : "Move reference to";
+            }
             var largeItem = cm.Items.OfType<MenuItem>()
                 .FirstOrDefault(mi => "LargeToggle".Equals(mi.Tag));
-            if (largeItem != null) largeItem.IsChecked = item.IsLarge;
+            if (largeItem != null) largeItem.IsChecked = files.Length > 0 && files.All(i => i.IsLarge);
             var destinations = cm.Items.OfType<MenuItem>().FirstOrDefault(mi => "MoveReferenceTo".Equals(mi.Tag));
             if (destinations != null && Application.Current is App app)
             {
@@ -1135,8 +1146,9 @@ public partial class PicketWindow : Window
                 foreach (var target in app.Pickets.Where(p => p != this))
                 {
                     var entry = new MenuItem { Header = target.ToState().Title,
-                        IsEnabled = !target.Items.Any(i => string.Equals(i.Path, item.Path, StringComparison.OrdinalIgnoreCase)) };
-                    entry.Click += (_, _) => MoveReferenceTo(item, target);
+                        IsEnabled = selected.Any(source => source.Kind == ItemKind.Label || !target.Items.Any(i => i.Kind == ItemKind.File &&
+                            string.Equals(i.Path, source.Path, StringComparison.OrdinalIgnoreCase))) };
+                    entry.Click += (_, _) => MoveReferencesTo(selected, target);
                     destinations.Items.Add(entry);
                 }
                 destinations.IsEnabled = destinations.Items.Count > 0;
@@ -1147,7 +1159,7 @@ public partial class PicketWindow : Window
     private void ItemMenu_Open_Click(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem mi && mi.DataContext is PicketItem item)
-            LaunchItem(item);
+            foreach (var selected in ActionItems(item)) LaunchItem(selected);
     }
 
     private void ItemMenu_OpenLocation_Click(object sender, RoutedEventArgs e)
@@ -1170,7 +1182,7 @@ public partial class PicketWindow : Window
     {
         if (sender is MenuItem mi && mi.DataContext is PicketItem item)
         {
-            item.IsLarge = !item.IsLarge;
+            foreach (var selected in ActionItems(item).Where(i => i.Kind == ItemKind.File)) selected.IsLarge = mi.IsChecked;
             RaiseLayoutChanged();
         }
     }
@@ -1179,7 +1191,7 @@ public partial class PicketWindow : Window
     {
         if (sender is MenuItem mi && mi.DataContext is PicketItem item)
         {
-            RemoveReferences(new[] { item });
+            RemoveReferences(ActionItems(item));
         }
     }
 

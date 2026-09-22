@@ -130,6 +130,7 @@ public sealed class AccessibilityTests
             CheckStackRetargeting(app, windows);
             CheckLabelBodyDropRouting(app, windows);
             CheckCompactRows(app, windows);
+            CheckRectangleSelection(app, windows);
             CheckReleasePolish(app, windows);
         }
         finally
@@ -138,6 +139,106 @@ public sealed class AccessibilityTests
             app.Frames.Dispose();
             // Do not call App.Shutdown: normal OnExit persists the user's real layout.
             Dispatcher.CurrentDispatcher.InvokeShutdown();
+        }
+    }
+
+    private static void CheckRectangleSelection(App app, List<PicketWindow> windows)
+    {
+        var window = new PicketWindow(new PicketState { Title = "Rectangle selection", Width = 360, Height = 225, AutoSizeRows = false });
+        var target = new PicketWindow(new PicketState { Title = "Bulk destination", AutoSizeRows = false });
+        windows.AddRange([window, target]);
+        ((IList<PicketWindow>)app.Pickets).Add(window);
+        ((IList<PicketWindow>)app.Pickets).Add(target);
+        for (var i = 0; i < 15; i++) window.Items.Add(new PicketItem { Path = @"Z:\fixture\" + i, DisplayName = "Reference " + i });
+        var content = window.Content;
+        window.Content = null;
+        var host = new Window { Content = content, Resources = window.Resources, Left = -32000, Top = -32000, Width = 360, Height = 225,
+            ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
+            AllowsTransparency = true, Background = Brushes.Transparent };
+        host.Show();
+        host.UpdateLayout();
+        try
+        {
+            var body = (FrameworkElement)window.FindName("BodyArea");
+            var scroll = (ScrollViewer)window.FindName("BodyScroll");
+            var list = (ListBox)window.FindName("ItemsHost");
+            Point InItem(int index)
+            {
+                var cell = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(index);
+                return cell.TranslatePoint(new Point(8, 40), body);
+            }
+            var start = new Point(5, 5);
+            window.BeginBoxSelection(start, System.Windows.Input.ModifierKeys.None);
+            window.UpdateBoxSelection(InItem(1));
+            Assert.Equal(new[] { window.Items[0], window.Items[1] }, list.SelectedItems.Cast<PicketItem>());
+            host.UpdateLayout();
+            Assert.True(((FrameworkElement)window.FindName("SelectionBox")).IsVisible);
+            Capture((FrameworkElement)content, "pickets-rectangle-selection.png", 360, 225);
+            window.EndBoxSelection();
+            Assert.Equal(Visibility.Collapsed, ((FrameworkElement)window.FindName("SelectionBox")).Visibility);
+            Assert.Equal(2, window.ActionItems(window.Items[0]).Length);
+            var selectedCell = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(0);
+            var prepareMenu = typeof(PicketWindow).GetMethod("Item_ContextMenuOpening", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            prepareMenu.Invoke(window, [selectedCell, null!]);
+            var menu = selectedCell.ContextMenu;
+            menu.DataContext = window.Items[0];
+            Assert.Contains(menu.Items.OfType<MenuItem>(), entry => Equals(entry.Header, "Remove 2 items from picket"));
+            var large = menu.Items.OfType<MenuItem>().Single(entry => Equals(entry.Tag, "LargeToggle"));
+            large.IsChecked = true;
+            large.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.True(window.Items[0].IsLarge && window.Items[1].IsLarge);
+            Assert.False(window.Items[2].IsLarge);
+            large.IsChecked = false;
+            large.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            host.UpdateLayout();
+
+            window.BeginBoxSelection(start, System.Windows.Input.ModifierKeys.Control);
+            window.UpdateBoxSelection(InItem(0));
+            window.EndBoxSelection();
+            Assert.Same(window.Items[1], Assert.Single(list.SelectedItems.Cast<PicketItem>()));
+            window.BeginBoxSelection(start, System.Windows.Input.ModifierKeys.Shift);
+            window.UpdateBoxSelection(InItem(0));
+            window.EndBoxSelection();
+            Assert.Equal(2, list.SelectedItems.Count);
+            window.BeginBoxSelection(start, System.Windows.Input.ModifierKeys.None);
+            window.UpdateBoxSelection(InItem(2));
+            window.EndBoxSelection(cancel: true);
+            Assert.Equal(new[] { window.Items[0], window.Items[1] }, list.SelectedItems.Cast<PicketItem>().OrderBy(i => i.Path));
+
+            window.BeginBoxSelection(start, System.Windows.Input.ModifierKeys.None);
+            window.UpdateBoxSelection(new Point(220, body.ActualHeight - 5));
+            var tick = typeof(PicketWindow).GetMethod("SelectionFrame", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            for (var i = 0; i < 20; i++) tick.Invoke(window, [TimeSpan.FromMilliseconds(i * 50)]);
+            Assert.True(scroll.VerticalOffset > 0);
+            Assert.Contains(list.SelectedItems.Cast<PicketItem>(), item => window.Items.IndexOf(item) >= 6);
+            window.EndBoxSelection();
+
+            // Bulk transfer preserves capture ownership and leaves duplicates in the source.
+            var first = window.Items[0];
+            var duplicate = window.Items[1];
+            first.OriginalDesktopPos = new POINT(42, 64);
+            target.Items.Add(new PicketItem { Path = duplicate.Path, DisplayName = "Existing reference" });
+            var moved = window.TransferReferences([first, duplicate], target);
+            Assert.Same(first, Assert.Single(moved));
+            Assert.Contains(duplicate, window.Items);
+            Assert.Contains(first, target.Items);
+            Assert.Equal(42, first.OriginalDesktopPos!.Value.X);
+            first.OriginalDesktopPos = null; // The fixture never owns an actual desktop icon.
+            window.RemoveReferences([duplicate]);
+            Assert.DoesNotContain(duplicate, window.Items);
+        }
+        finally
+        {
+            window.EndBoxSelection(cancel: true);
+            host.Content = null;
+            host.Close();
+            window.Content = content;
+            window.CloseForLayoutChange();
+            target.CloseForLayoutChange();
+            ((IList<PicketWindow>)app.Pickets).Remove(window);
+            ((IList<PicketWindow>)app.Pickets).Remove(target);
+            windows.Remove(window);
+            windows.Remove(target);
         }
     }
 

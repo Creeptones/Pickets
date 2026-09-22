@@ -48,6 +48,12 @@ Build: use `release/Pickets.exe` and `release/PicketsSetup.exe` from this checko
 
 **Round 2 — the recovery blocker. About 10 minutes**
 
+- [ ] **Rectangle and bulk actions.** Drag from empty space across two references, then right-click
+      a selected item and toggle Large icon. **Pass:** both icons change and the others do not.
+      Check Shift-add, Ctrl-toggle, Escape cancellation, and edge scrolling. Move selected references
+      to another picket; duplicates remain in the source. Remove test references and verify captured
+      desktop icons return. Labels can be included in a selection.
+
 - [ ] **Compact rows.** Open a short section and one containing more than two rows of icons.
       **Pass:** the short section fits one row; the larger section shows two complete rows and
       scrolls to the rest. Labels remain readable and connected titles remain attached. Add/remove

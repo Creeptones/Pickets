@@ -137,6 +137,11 @@ more references. Short groups use one row; labels remain compact. Names use up t
 the full reference available in the tooltip. Manually resizing the height overrides automatic
 sizing for the connected stack; resizing only its width keeps automatic sizing.
 
+Drag from empty space inside a picket to rectangle-select items. Hold **Shift** to add to the
+selection or **Ctrl** to toggle items; **Escape** cancels the rectangle. Drag near the top or
+bottom edge to scroll. Right-click a selected item to open, check, resize, move, or remove the
+selection. Removal only removes references and restores captured desktop icons; originals stay put.
+
 Connected groups form a row or a column. Joining pickets into an irregular arrangement, such as an
 L-shape or grid, settles the group into one vertical stack. Membership, order,
 sizing, and collapsed state are saved across restarts and display profiles. Use **Stack → Detach picket** to detach one; merely moving the group does not break it apart.

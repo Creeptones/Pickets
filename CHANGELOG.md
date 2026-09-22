@@ -5,6 +5,10 @@ All notable changes to Pickets are documented here. Versions follow
 
 ## [Unreleased]
 
+- Rectangle selection inside pickets with Shift-add, Ctrl-toggle, Escape cancellation, and
+  edge scrolling. Context menus apply supported actions to the selection, including reference
+  transfers, icon sizing, availability checks, opening, and removal.
+
 ## [1.0.0] - release candidate (publication pending)
 
 The first release is awaiting the live Windows checks in `docs/TEST_RELEASE.md`.

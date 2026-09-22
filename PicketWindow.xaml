@@ -22,15 +22,16 @@
         <local:PicketLabelWidthConverter x:Key="LabelWidthConverter"/>
         <local:PicketTextHeightConverter x:Key="TextHeightConverter"/>
         <ContextMenu x:Key="ItemContextMenu" DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-            <MenuItem Header="Open" Click="ItemMenu_Open_Click"/>
-            <MenuItem Header="Check again" Click="ItemMenu_Check_Click"/>
-            <MenuItem Header="Locate..." Click="ItemMenu_Locate_Click"/>
-            <MenuItem Header="Open file location" Click="ItemMenu_OpenLocation_Click"/>
+            <MenuItem Header="Open" Tag="Open" Click="ItemMenu_Open_Click"/>
+            <MenuItem Header="Check again" Tag="Check" Click="ItemMenu_Check_Click"/>
+            <MenuItem Header="Locate..." Tag="Locate" Click="ItemMenu_Locate_Click"/>
+            <MenuItem Header="Open file location" Tag="Location" Click="ItemMenu_OpenLocation_Click"/>
             <MenuItem Header="Move reference to" Tag="MoveReferenceTo"/>
             <MenuItem Header="Large icon" Tag="LargeToggle" IsCheckable="True" Click="ItemMenu_ToggleLarge_Click"/>
             <Separator/>
-            <MenuItem Header="Insert label above..." Click="ItemMenu_InsertLabelAbove_Click"/>
-            <MenuItem Header="Remove from picket" Click="ItemMenu_Remove_Click"/>
+            <MenuItem Header="Insert label above..." Tag="InsertLabel" Click="ItemMenu_InsertLabelAbove_Click"/>
+            <MenuItem Header="Rename label..." Tag="RenameLabel" Visibility="Collapsed" Click="LabelMenu_Rename_Click"/>
+            <MenuItem Header="Remove from picket" Tag="Remove" Click="ItemMenu_Remove_Click"/>
         </ContextMenu>
         <ContextMenu x:Key="LabelContextMenu" DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
             <MenuItem Header="Rename label..." Click="LabelMenu_Rename_Click"/>
@@ -227,13 +228,15 @@
                         </StackPanel>
                     </Grid>
                 </Border>
+                <Grid x:Name="BodyArea" ClipToBounds="True"
+                      PreviewMouseLeftButtonDown="Selection_MouseDown" PreviewMouseMove="Selection_MouseMove"
+                      PreviewMouseLeftButtonUp="Selection_MouseUp" LostMouseCapture="Selection_LostCapture">
                 <ScrollViewer x:Name="BodyScroll"
                               VerticalScrollBarVisibility="Auto"
                               Padding="4"
                               AllowDrop="True"
                               Drop="ItemsHost_Drop"
-                              Background="Transparent"
-                              MouseLeftButtonDown="BodyScroll_MouseLeftButtonDown">
+                              Background="Transparent">
                     <Grid>
                     <ListBox x:Name="ItemsHost" SelectionMode="Extended" BorderThickness="0" Padding="0" Background="Transparent"
                         AutomationProperties.Name="Picket references" KeyboardNavigation.TabNavigation="Once"
@@ -247,6 +250,7 @@
                                 <Setter Property="Foreground" Value="{DynamicResource PicketItemForeground}"/>
                                 <Setter Property="VerticalAlignment" Value="Top"/>
                                 <EventSetter Event="PreviewMouseLeftButtonDown" Handler="Item_MouseDown"/>
+                                <EventSetter Event="PreviewMouseRightButtonDown" Handler="Item_RightMouseDown"/>
                                 <EventSetter Event="MouseMove" Handler="Item_MouseMove"/>
                                 <EventSetter Event="MouseLeftButtonUp" Handler="Item_MouseLeftButtonUp"/>
                                 <EventSetter Event="ContextMenuOpening" Handler="Item_ContextMenuOpening"/>
@@ -267,11 +271,6 @@
                                         </ControlTemplate>
                                     </Setter.Value>
                                 </Setter>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Kind}" Value="Label">
-                                        <Setter Property="ContextMenu" Value="{StaticResource LabelContextMenu}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
                             </Style>
                         </ListBox.ItemContainerStyle>
                         <ListBox.Resources>
@@ -338,6 +337,11 @@
                     </StackPanel>
                     </Grid>
                 </ScrollViewer>
+                <Canvas IsHitTestVisible="False">
+                    <Rectangle x:Name="SelectionBox" Visibility="Collapsed" Stroke="{DynamicResource PicketFocusBorder}"
+                               StrokeThickness="1" Fill="{DynamicResource PicketSelectionBrush}" Opacity="0.55"/>
+                </Canvas>
+                </Grid>
             </DockPanel>
         </Border>
 

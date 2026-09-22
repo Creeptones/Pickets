@@ -160,3 +160,10 @@ removal, saved-profile defaults/overrides, and mixed-height stack seams at 100â€
 The rendered normal and large-text layouts were inspected. The user passed the live check of
 two complete rows and scrolling to additional icons in Ephemera Development. The other release
 matrix checks remain tracked in `TEST_RELEASE.md`.
+
+### Rectangle selection (2026-09-22)
+
+The user passed rectangle-selecting two references and applying Large icon through their context
+menu. All 130 automated tests passed, including real WPF selection, Shift/Ctrl modifiers, Escape
+cancellation, edge scrolling, bulk icon sizing, and transfers that preserve ownership and skip
+duplicates. The selection overlay render was inspected. Remaining live checks are in `TEST_RELEASE.md`.

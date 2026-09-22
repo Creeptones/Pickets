@@ -66,6 +66,12 @@ public partial class PicketWindow
         var ctrl = mods.HasFlag(ModifierKeys.Control);
         var shift = mods.HasFlag(ModifierKeys.Shift);
         var alt = mods.HasFlag(ModifierKeys.Alt);
+        if (key == Key.Escape && _boxStart != null)
+        {
+            EndBoxSelection(cancel: true);
+            e.Handled = true;
+            return;
+        }
         if (key == Key.Escape && _titleGesture.IsPending)
         {
             CancelTitleGesture();
@@ -80,7 +86,11 @@ public partial class PicketWindow
         else if (key == Key.F2) BeginRename();
         else if (key == Key.Escape) { SetExpanded(false); TitleToggle.Focus(); }
         else if (key == Key.Delete && ItemsHost.IsKeyboardFocusWithin) RemoveReferences(ItemsHost.SelectedItems.Cast<PicketItem>());
-        else if (key == Key.Enter && ItemsHost.IsKeyboardFocusWithin && ItemsHost.SelectedItem is PicketItem item) LaunchItem(item);
+        else if (key == Key.A && ctrl && ItemsHost.IsKeyboardFocusWithin) ItemsHost.SelectAll();
+        else if (key == Key.Enter && ItemsHost.IsKeyboardFocusWithin)
+        {
+            foreach (var selected in ItemsHost.SelectedItems.Cast<PicketItem>().ToArray()) LaunchItem(selected);
+        }
         else if (key is Key.Up or Key.Down && ctrl && shift && !alt)
         {
             var delta = key == Key.Up ? -1 : 1;
