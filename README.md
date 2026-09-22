@@ -11,6 +11,12 @@ inside movable, translucent groups at the wallpaper layer. Your files stay in th
 - Choose a guided per-user installer or a standalone portable build.
 - Your files stay where they are; Pickets manages their desktop presentation.
 
+## Test-build feature freeze
+
+The pre-release UX and safety pass is frozen for hands-on testing. No further features are planned
+before test sign-off; only release-blocking fixes. See the [focused test plan](docs/TEST_BUILD.md)
+and [full release checklist](docs/RELEASE_CHECKLIST.md). A local rebuild is not a new public release.
+
 ## Install and first run
 
 ### Choose a download
@@ -107,14 +113,19 @@ menu at any time.
 | Open or roll up a picket | Single-click its title |
 | Move a picket or connected stack | Drag its title bar |
 | Resize a picket or connected group | Drag an outside edge or corner |
-| Return a captured icon to the desktop | Drag it out, or choose **Remove reference** |
+| Return a captured icon to the desktop | Drag it out, or choose **Remove from picket** |
 | Remove any reference | Select it and press **Delete**; the original file is never deleted |
 | Open an item | Double-click it |
 | Focus Pickets | **Ctrl+Alt+D** by default; press again while focused to hide |
 | Hide or show every picket | Double-click the desktop or use the tray icon |
-| Create, customize, or delete a picket | Right-click its title |
+| Create, customize, or delete a picket | Click **⋯** or right-click its title |
 | Quit safely | Choose **Quit Pickets**; desktop icons are restored until the next launch |
-| Release icons permanently | Choose **Release all icons and quit**, or run with `--restore-icons` |
+| Release icons permanently | Tray → **Advanced recovery → Release all icons and quit**, or run with `--restore-icons` |
+| Hide with the keyboard | **Alt+F4** hides Pickets safely; it does not quit or delete a picket |
+
+Empty pickets offer **Add files…** and **Add folders…**, with a reminder that originals stay put.
+The title chevron indicates expansion, **⋯** opens the menu, and the outside corner shows a resize
+hint on hover or keyboard focus.
 
 Rolled-up pickets remain visible as a tidy stack of titles. Pickets snap to screen edges and one
 another, and connected groups stay flush, share one size, and move or resize as a single outer
@@ -124,15 +135,19 @@ large icons.
 
 Connected groups form a row or a column. Joining pickets into an irregular arrangement, such as an
 L-shape or grid, settles the group into one consistently sized vertical stack. Membership, order,
-shared dimensions, and collapsed state are saved across restarts and display profiles. Use **Unlink
-section** to detach one; merely moving the group does not break it apart.
+shared dimensions, and collapsed state are saved across restarts and display profiles. Use **Stack → Detach picket** to detach one; merely moving the group does not break it apart.
 
 ### Optional accordion stacks
 
-Right-click a title and enable **Accordion: one section open**. The group becomes a vertical stack:
+Open the title menu and enable **Stack → Open one picket at a time**. The group becomes a vertical stack:
 opening a section closes the other bodies and slides their titles into place. Click the open title
 to collapse everything. Turn the option off to allow several open sections again. Body content
 scrolls when the stack needs to fit a smaller work area. Expanded sections retain one shared size.
+
+Very large stacks use pages to keep every visible title and body within the work area. Use the
+header's **‹ / ›** buttons, **Stack → Previous / Next page**, or **Ctrl+PageUp / Ctrl+PageDown**.
+**Ctrl+Tab** also reveals the page containing the next picket. Pages do not split membership or
+change saved order; the first page is shown after restart. Paged stacks change instantly.
 
 ### File references, not file operations
 
@@ -140,20 +155,22 @@ scrolls when the stack needs to fit a smaller work area. Expanded sections retai
 The same file can appear in several pickets. Dragging a desktop icon in retains the existing desktop
 capture behavior; adding it through the dialogs leaves its desktop icon visible.
 
-Right-click a reference for **Open file location**, **Check again**, **Locate file / Locate folder**,
+Right-click a reference for **Open file location**, **Check again**, **Locate…**,
 and **Move reference to** another picket. Locate updates the saved reference, not the original file.
 Unplugged drives, unavailable shares, and missing files stay saved with a visible status. Reconnect
 and choose **Check again**, or locate the replacement if it moved. Availability checks and thumbnails
-run off the UI thread with bounded concurrency and timeouts.
+run off the UI thread with bounded concurrency and timeouts. Opening a reference waits only for
+its availability check, never its thumbnail. Short status text is paired with path and recovery
+instructions in its tooltip and accessibility help.
 
 Dragging between pickets transfers a reference. Dragging a captured icon out restores its desktop
 presentation. Other reference drags remain inside Pickets; they never ask Explorer to move or copy
-the source. **Remove reference** removes only the reference (and restores a captured desktop icon).
+the source. **Remove from picket** removes only the reference (and restores a captured desktop icon).
 
 ### Keyboard and accessibility
 
 Use **Focus Pickets** in the tray or the configurable global shortcut (default **Ctrl+Alt+D**).
-Change it from the tray or title menu → **Settings → Change focus shortcut**; **None** disables it.
+Change it from the tray or title menu → **Settings and help → Change focus shortcut**; **None** disables it.
 If another app owns the key combination, Pickets reports the conflict and keeps your previous setting.
 
 | Key | Action |
@@ -174,11 +191,15 @@ If another app owns the key combination, Pickets reports the conflict and keeps 
 | Ctrl+Shift+Up / Down | Reorder focused reference, or section when its title is focused |
 | Alt+Arrow | Move the connected group |
 | Ctrl+Alt+Arrow | Resize the connected group |
-| F1 | Keyboard help |
+| Ctrl+PageUp / Ctrl+PageDown | Previous / next page of a large stack |
+| Alt+F4 | Hide Pickets safely without closing tracked windows |
+| F1 | Scrollable keyboard help, including your configured focus shortcut |
 
 Titles expose names and expanded/collapsed state through Windows UI Automation; references expose
 selection and availability information. Controls have visible focus indicators, use Windows
 high-contrast colors when enabled, and accommodate larger text with wrapping and scrolling.
+Welcome, About, and keyboard help also resize and scroll, use high-contrast colors, and keep their
+primary action visible on smaller screens. Start stays disabled until desktop readiness is confirmed.
 Animations respect the Windows animation preference. Automated UI Automation and rendering tests
 cover this baseline; a hands-on Narrator and mixed-DPI focus pass remains part of the
 [release checklist](docs/RELEASE_CHECKLIST.md).
@@ -299,7 +320,7 @@ are disabled. Explorer may briefly redraw an icon before Pickets hides it again.
 left-click the Pickets tray icon. Launching Pickets again also surfaces the already-running instance.
 
 **Launch at login stopped working after moving the executable:** Open a picket's title menu and
-toggle **Launch at login** off and back on. This records the new portable executable path.
+toggle **Settings and help → Start at sign-in** off and back on. This records the new portable executable path.
 
 **Setup says Pickets is still running:** Choose **Quit Pickets** from the tray menu, then continue
 Setup. Normal Quit restores the desktop icons while the app is closed; they are collected again
@@ -313,7 +334,7 @@ when the updated app starts.
 not hide it again.
 
 **A drive or file is unavailable:** The reference stays saved. Reconnect its location and choose
-**Check again**, or use **Locate file / Locate folder**. Pickets never automatically deletes missing
+**Check again**, or use **Locate…**. Pickets never automatically deletes missing
 references.
 
 ## Privacy and security

@@ -3,20 +3,24 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using System.Windows.Interop;
 
 namespace Pickets;
 
-public partial class WelcomeWindow : Window
+public partial class WelcomeWindow : AccessibleDialogWindow
 {
     private static readonly Brush ReadyBrush = new SolidColorBrush(Color.FromRgb(0x63, 0xC1, 0x78));
     private static readonly Brush ActionBrush = new SolidColorBrush(Color.FromRgb(0xF0, 0xB3, 0x5A));
 
     public bool CreateDesktopShortcut => CreateShortcutCheck.IsChecked == true && CreateShortcutCheck.IsEnabled;
     public bool RunAtLogin => RunAtLoginCheck.IsChecked == true;
+    private readonly Func<DesktopReadiness> _readReadiness;
 
     public WelcomeWindow(bool shortcutExists, bool runAtLogin)
+        : this(shortcutExists, runAtLogin, DesktopReadiness.Read) { }
+
+    internal WelcomeWindow(bool shortcutExists, bool runAtLogin, Func<DesktopReadiness> readReadiness)
     {
+        _readReadiness = readReadiness;
         InitializeComponent();
         CreateShortcutCheck.IsChecked = OnboardingPreferences.DefaultCreateShortcut(shortcutExists);
         if (shortcutExists)
@@ -30,19 +34,15 @@ public partial class WelcomeWindow : Window
         RunAtLoginCheck.IsChecked = runAtLogin;
         RefreshDesktopStatus();
         Activated += (_, _) => RefreshDesktopStatus();
-        Loaded += (_, _) => FitWorkArea();
-        SourceInitialized += (_, _) =>
-        {
-            HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WindowMessages);
-            FitWorkArea();
-        };
     }
 
     private void Recheck_Click(object sender, RoutedEventArgs e) => RefreshDesktopStatus();
 
     private DesktopReadiness RefreshDesktopStatus()
     {
-        var readiness = DesktopReadiness.Read();
+        var readiness = _readReadiness();
+        GetStartedButton.IsEnabled = readiness.IsReady;
+        GetStartedButton.ToolTip = readiness.IsReady ? "Your desktop is ready." : "Complete the desktop settings above to continue.";
         SetStatus(AutoArrangeStatus, AutoArrangeIndicator, "Auto arrange", readiness.AutoArrange);
         SetStatus(SnapToGridStatus, SnapToGridIndicator, "Align to grid", readiness.AlignToGrid);
         ReadinessHint.Text = readiness.IsReady ? "Your desktop is ready."
@@ -70,34 +70,4 @@ public partial class WelcomeWindow : Window
         Close();
     }
 
-    private IntPtr WindowMessages(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
-    {
-        if (message is 0x02E0 or 0x007E) // DPI or display configuration changed.
-            Dispatcher.BeginInvoke(FitWorkArea);
-        return IntPtr.Zero;
-    }
-
-    private void FitWorkArea()
-    {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        var work = System.Windows.Forms.Screen.FromHandle(hwnd).WorkingArea;
-        var dpi = VisualTreeHelper.GetDpi(this);
-        var available = WelcomeSizing.Available(work.Width, work.Height, dpi.DpiScaleX, dpi.DpiScaleY);
-        MinWidth = Math.Min(360, available.Width);
-        MinHeight = Math.Min(300, available.Height);
-        MaxWidth = available.Width;
-        MaxHeight = available.Height;
-        Width = Math.Min(Width, MaxWidth);
-        Height = Math.Min(Height, MaxHeight);
-        if (IsLoaded && WindowInterop.GetWindowRect(hwnd, out var bounds))
-        {
-            var width = (int)Math.Ceiling(Width * dpi.DpiScaleX);
-            var height = (int)Math.Ceiling(Height * dpi.DpiScaleY);
-            var x = Math.Clamp(bounds.left, work.Left, Math.Max(work.Left, work.Right - width));
-            var y = Math.Clamp(bounds.top, work.Top, Math.Max(work.Top, work.Bottom - height));
-            const uint noZOrder = 0x0004;
-            WindowInterop.SetWindowPos(hwnd, IntPtr.Zero, x, y, 0, 0,
-                WindowInterop.SWP_NOSIZE | WindowInterop.SWP_NOACTIVATE | noZOrder);
-        }
-    }
 }

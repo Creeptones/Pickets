@@ -7,6 +7,9 @@ All notable changes to Pickets are documented here. Versions follow
 
 ### Added
 
+- Actionable empty pickets, expansion chevrons, explicit title menus, and outside-corner resize hints.
+- Work-area-aware paging for oversized stacks, with header controls and Ctrl+PageUp/PageDown.
+- Scrollable, resizable About and keyboard-help windows sharing onboarding's high-contrast styling.
 - Persistent connected stacks with saved membership/order and optional one-section-open accordion mode.
 - Add-file and add-folder reference dialogs; open location, availability checks, relinking, and
   keyboard-accessible transfers between pickets without moving or copying the original files.
@@ -20,11 +23,19 @@ All notable changes to Pickets are documented here. Versions follow
 
 ### Changed
 
+- Simplified reference and stack terminology; advanced recovery actions are separated from everyday controls.
+- Desktop readiness now controls the Start button, with an explanation when readiness is unknown.
+- Features are frozen for the local pre-release test build; see `docs/TEST_BUILD.md`.
 - Installation guidance now walks portable users through choosing a permanent location before
   creating shortcuts or enabling launch at login.
 
 ### Fixed
 
+- Alt+F4 and ordinary picket-window close requests safely hide Pickets without losing tracked windows
+  or desktop-icon recovery metadata; application-managed teardown remains explicit.
+- Launch availability checks no longer await thumbnail generation. Compact unavailable statuses retain
+  detailed path and recovery instructions in tooltips and accessibility help.
+- Oversized stacks remain reachable without breaking membership/order, including across page changes.
 - Unavailable and missing references remain saved instead of being removed by cleanup.
 - Reference probes and thumbnails run off the UI thread with bounded concurrency and timeouts.
 - Reference drags no longer advertise filesystem moves to Explorer; failed desktop-icon restoration

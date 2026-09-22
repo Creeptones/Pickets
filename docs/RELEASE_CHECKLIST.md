@@ -40,7 +40,7 @@
 - [ ] Exercise lasso creation, roll-up stacks, group movement, resizing, and unlinking.
 - [ ] Join an L-shape/grid and verify it becomes one flush column that moves and resizes together.
 - [ ] Disconnect a removable/network drive; references remain, the UI responds, and **Check again**
-      recovers them after reconnection. Test **Locate file / Locate folder** for renamed items.
+      recovers them after reconnection. Test **Locate…** for both renamed files and folders.
 - [ ] Enable accordion mode; switch sections, collapse all, disable it, and restart.
 - [ ] Resize from the bottom of a collapsed final section; all expanded bodies keep the shared size.
 - [ ] Save a stack, reconnect monitors, and confirm membership/order and flush seams persist.
@@ -56,6 +56,13 @@
 - [ ] Verify copied diagnostics redact the Windows username and user-profile path.
 
 ## Release
+
+### Frozen UX/safety candidate (2026-09-21)
+
+See [the focused test plan](TEST_BUILD.md) for the five polish items and two edge-case fixes.
+Automated checks and isolated WPF renders cover the candidate; the live matrix above remains
+required. In particular, verify Alt+F4/return/Quit recovery and oversized-stack paging on real monitors.
+The existing 1.0.0 version is retained; use the source commit and generated hashes to identify this build.
 
 ### Interaction implementation verification (2026-09-21)
 

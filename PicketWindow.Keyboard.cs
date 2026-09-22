@@ -15,6 +15,8 @@ public partial class PicketWindow
 {
     internal void FocusForKeyboard()
     {
+        if (Application.Current is App { PicketsHidden: true } app) app.ShowPickets();
+        RevealOnStackPage();
         Show();
         Activate();
         var hwnd = new WindowInteropHelper(this).Handle;
@@ -53,10 +55,8 @@ public partial class PicketWindow
         if (Application.Current is App app) app.ConfigureFocusShortcut(this);
     }
 
-    internal static void ShowKeyboardHelp() => MessageBox.Show(
-        "Focus Pickets: Ctrl+Alt+D by default; change it in Settings or the tray. Press again while a picket has focus to hide.\n\n" +
-        "Ctrl+Tab / Ctrl+Shift+Tab: next / previous picket\nTab / Shift+Tab: move between controls\nEnter or Space on a title: expand / collapse\nDown on a title: enter references\nArrow keys: navigate references\nSpace / Ctrl+Space: select / toggle selection\nShift+Arrow: extend selection\nEnter: open selected reference\nDelete: remove selected references (never deletes files)\nShift+F10: context menu\nF2: rename this picket\nEscape: collapse and focus its title\nCtrl+O / Ctrl+Shift+O: add files / folders\nCtrl+N: new picket\nCtrl+Shift+Up / Down: reorder focused reference, or section when title has focus\nAlt+Arrow: move stack\nCtrl+Alt+Arrow: resize stack\nF1: this help",
-        "Pickets keyboard help", MessageBoxButton.OK, MessageBoxImage.Information);
+    internal static void ShowKeyboardHelp()
+        => new KeyboardHelpWindow(Application.Current is App app ? app.CurrentFocusShortcut : "Ctrl+Alt+D").Show();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -67,6 +67,7 @@ public partial class PicketWindow
         var shift = mods.HasFlag(ModifierKeys.Shift);
         var alt = mods.HasFlag(ModifierKeys.Alt);
         if (key == Key.F1) ShowKeyboardHelp();
+        else if (ctrl && key is Key.PageUp or Key.PageDown) ChangeStackPage(key == Key.PageUp ? -1 : 1);
         else if (key == Key.Tab && ctrl && Application.Current is App app) app.FocusNextPicket(this, shift ? -1 : 1);
         else if (key == Key.O && ctrl && !alt) { if (shift) AddFolder(); else AddFiles(); }
         else if (key == Key.N && ctrl && Application.Current is App createApp) createApp.CreatePicket(Left + 30, Top + 30);

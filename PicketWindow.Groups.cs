@@ -18,6 +18,63 @@ public partial class PicketWindow
     private bool _accordionMode;
     private Action? _finishRollAnimation;
     internal bool NeedsGroupMigration { get; private set; }
+    private int _stackPageIndex;
+    private int _stackPageCount = 1;
+    internal bool IsOnStackPage { get; private set; } = true;
+
+    internal void ShowIfOnStackPage()
+    {
+        if (IsOnStackPage) Show();
+    }
+
+    private static StackPage GetStackPage(List<PicketWindow> group)
+    {
+        var first = group[0];
+        var work = first.GroupWorkArea();
+        return StackViewport.Page(group.Count, work.Height, first._stackPageIndex, work.Width, first._groupHorizontal);
+    }
+
+    internal void RevealOnStackPage()
+    {
+        var group = ComputeTouchingCluster();
+        if (group.Count == 0) return;
+        var page = GetStackPage(group);
+        var required = group.IndexOf(this) / page.Capacity;
+        if (required == page.Index) return;
+        foreach (var p in group) p._stackPageIndex = required;
+        NormalizeConnectedGroup();
+    }
+
+    internal void ChangeStackPage(int direction, bool focus = true)
+    {
+        var group = ComputeTouchingCluster();
+        foreach (var p in group) p._finishRollAnimation?.Invoke();
+        var page = GetStackPage(group);
+        foreach (var p in group) p._stackPageIndex = Math.Clamp(page.Index + direction, 0, page.Count - 1);
+        NormalizeConnectedGroup();
+        if (focus) group.First(p => p.IsOnStackPage).FocusForKeyboard();
+    }
+
+    private void PreviousStackPage_Click(object sender, RoutedEventArgs e) => ChangeStackPage(-1);
+    private void NextStackPage_Click(object sender, RoutedEventArgs e) => ChangeStackPage(1);
+
+    private void UpdateStackPageControls(StackPage page, bool onPage)
+    {
+        var wasOnPage = IsOnStackPage;
+        IsOnStackPage = onPage;
+        _stackPageIndex = page.Index;
+        _stackPageCount = page.Count;
+        PreviousPageButton.Visibility = NextPageButton.Visibility = page.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+        PreviousPageButton.IsEnabled = page.Index > 0;
+        NextPageButton.IsEnabled = page.Index + 1 < page.Count;
+        var position = $"Stack page {page.Index + 1} of {page.Count}";
+        PreviousPageButton.ToolTip = position + " — previous page (Ctrl+PageUp)";
+        NextPageButton.ToolTip = position + " — next page (Ctrl+PageDown)";
+        System.Windows.Automation.AutomationProperties.SetHelpText(TitleToggle,
+            "Expand or collapse this picket. Drag to move its stack. " + (page.Count > 1 ? position : ""));
+        if (!onPage && IsVisible) Hide();
+        else if (onPage && !wasOnPage && IsLoaded && Application.Current is App { PicketsHidden: false }) Show();
+    }
 
     private List<PicketWindow> ComputeTouchingCluster()
         => Application.Current is App app
@@ -35,19 +92,24 @@ public partial class PicketWindow
             added = false;
             foreach (var candidate in app.Pickets)
             {
-                if (cluster.Contains(candidate) || (migrateOnly && !candidate.NeedsGroupMigration)) continue;
-                if (!cluster.Any(p => AreGrouped(p, candidate))) continue;
+                if (cluster.Contains(candidate) || !candidate.IsOnStackPage || (migrateOnly && !candidate.NeedsGroupMigration)) continue;
+                if (!cluster.Any(p => p.IsOnStackPage && AreGrouped(p, candidate))) continue;
                 foreach (var member in candidate.ComputeTouchingCluster())
                     if (!cluster.Contains(member)) cluster.Add(member);
                 added = true;
             }
         } while (added);
         if (cluster.Count == originalCount && !migrateOnly) { NormalizeConnectedGroup(); return; }
-        var horizontal = GetSimpleGroupOrientation(cluster) == GroupOrientation.Row;
+        var horizontal = GetSimpleGroupOrientation(cluster.Where(p => p.IsOnStackPage).ToList()) == GroupOrientation.Row;
         var accordion = cluster.Any(p => p._accordionMode);
         if (accordion) horizontal = false;
-        var ordered = horizontal ? cluster.OrderBy(p => p.Left).ThenBy(p => p.Top).ToList()
-            : cluster.OrderBy(p => p.Top).ThenBy(p => p.Left).ToList();
+        // Hidden pages share an anchor, not a physical order. Keep each existing stack intact
+        // when joining another stack; use visible geometry only to order the stacks themselves.
+        var groups = cluster.GroupBy(p => p.GroupId);
+        var orderedGroups = horizontal
+            ? groups.OrderBy(g => g.Where(p => p.IsOnStackPage).Min(p => p.Left))
+            : groups.OrderBy(g => g.Where(p => p.IsOnStackPage).Min(p => p.Top));
+        var ordered = orderedGroups.SelectMany(g => g.OrderBy(p => p.GroupOrder).ThenBy(p => p.PicketId)).ToList();
         var id = ordered[0].GroupId;
         for (var i = 0; i < ordered.Count; i++)
         {
@@ -97,17 +159,20 @@ public partial class PicketWindow
         if (group.Count == 0) return;
         var first = group[0];
         var work = first.GroupWorkArea();
-        if (first._groupHorizontal && group.Count * group.Max(p => p.MinWidth) > work.Width)
-            foreach (var p in group) p._groupHorizontal = false;
+        var page = GetStackPage(group);
+        var visible = group.Skip(page.Start).Take(page.Length).ToList();
         var dpi = VisualTreeHelper.GetDpi(first);
         var bounds = StackLayout.Arrange(new Point(first.Left, first.Top), width, expandedHeight,
-            group.Select(p => p._isCollapsed).ToList(), first._groupHorizontal, work, dpi.DpiScaleX, dpi.DpiScaleY);
+            visible.Select(p => p._isCollapsed).ToList(), first._groupHorizontal, work, dpi.DpiScaleX, dpi.DpiScaleY);
         for (var i = 0; i < group.Count; i++)
         {
-            group[i].Left = bounds[i].Left;
-            group[i].Top = bounds[i].Top;
-            group[i].Width = bounds[i].Width;
-            group[i].Height = bounds[i].Height;
+            var onPage = page.Contains(i);
+            var rect = onPage ? bounds[i - page.Start] : bounds[0];
+            group[i].Left = rect.Left;
+            group[i].Top = rect.Top;
+            group[i].Width = rect.Width;
+            group[i].Height = onPage ? rect.Height : group[i]._isCollapsed ? StackLayout.TitleHeight : expandedHeight;
+            group[i].UpdateStackPageControls(page, onPage);
         }
     }
 
@@ -117,6 +182,12 @@ public partial class PicketWindow
         if (group.Any(p => p._isRollAnimating)) return;
         var states = StackLayout.CollapseStates(group.Select(p => p._isCollapsed).ToArray(),
             group.IndexOf(this), collapsed, _accordionMode);
+        if (GetStackPage(group).Count > 1)
+        {
+            for (var i = 0; i < group.Count; i++) group[i]._isCollapsed = states[i];
+            NormalizeConnectedGroup();
+            return;
+        }
         var start = group.Select(p => new Rect(p.Left, p.Top, p.Width, p.Height)).ToArray();
         var first = group[0];
         var dpi = VisualTreeHelper.GetDpi(first);
@@ -169,10 +240,13 @@ public partial class PicketWindow
     {
         BodyScroll.Visibility = _isCollapsed ? Visibility.Collapsed : Visibility.Visible;
         TitleToggle.IsExpanded = !_isCollapsed;
+        ExpansionChevron.Text = _isCollapsed ? "›" : "⌄";
+        TitleToggle.ToolTip = _isCollapsed ? "Expand picket; drag to move stack" : "Collapse picket; drag to move stack";
     }
 
     internal void SetExpanded(bool expanded)
     {
+        if (expanded) RevealOnStackPage();
         if (_isCollapsed == !expanded || _isRollAnimating) return;
         NormalizeConnectedGroup();
         AnimateStack(!expanded);
@@ -218,5 +292,6 @@ public partial class PicketWindow
         group[0].Left = anchor.X;
         group[0].Top = anchor.Y;
         group[0].NormalizeConnectedGroup();
+        RevealOnStackPage();
     }
 }

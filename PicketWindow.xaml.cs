@@ -227,6 +227,7 @@ public partial class PicketWindow : Window
         {
             foreach (var other in app.Pickets)
             {
+                if (!other.IsOnStackPage || other.GroupId == GroupId) continue;
                 var oh = new WindowInteropHelper(other).Handle;
                 if (oh == selfHwnd || oh == IntPtr.Zero) continue;
                 if (!WindowInterop.GetWindowRect(oh, out var o)) continue;
@@ -423,7 +424,8 @@ public partial class PicketWindow : Window
     {
         if (ResizeRight == null || ResizeBottom == null || ResizeBottomRight == null) return;
 
-        var cluster = ComputeTouchingCluster();
+        var cluster = ComputeTouchingCluster().Where(p => p.IsOnStackPage).ToList();
+        if (cluster.Count == 0) return;
         var groupRight = cluster.Max(p => p.Left + p.Width);
         var groupBottom = cluster.Max(p => p.Top + p.Height);
         var onRightEdge = Math.Abs(Left + Width - groupRight) <= GROUP_GAP;
@@ -432,6 +434,7 @@ public partial class PicketWindow : Window
         ResizeRight.IsHitTestVisible = onRightEdge;
         ResizeBottom.IsHitTestVisible = onBottomEdge;
         ResizeBottomRight.IsHitTestVisible = onRightEdge && onBottomEdge;
+        ResizeHint.Visibility = onRightEdge && onBottomEdge ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>Makes a vertical run of separate native windows read as one continuous component.
@@ -440,7 +443,7 @@ public partial class PicketWindow : Window
     {
         if (Application.Current is not App app || OuterShell == null || TitleShell == null) return;
 
-        var aligned = app.Pickets.Where(other => other != this && other.GroupId == GroupId && HorizontallyOverlaps(other, this));
+        var aligned = app.Pickets.Where(other => other != this && other.IsOnStackPage && other.GroupId == GroupId && HorizontallyOverlaps(other, this));
         var hasAbove = aligned.Any(other => other.Top < Top &&
             Math.Abs(other.Top + other.Height - Top) <= GROUP_GAP);
         var hasBelow = aligned.Any(other => other.Top > Top &&
@@ -541,6 +544,33 @@ public partial class PicketWindow : Window
     private void TitleBar_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         if (sender is not FrameworkElement fe || fe.ContextMenu is not ContextMenu cm) return;
+        PrepareTitleMenu(cm);
+    }
+
+    private void MenuButton_Click(object sender, RoutedEventArgs e)
+    {
+        var menu = MenuButton.ContextMenu;
+        PrepareTitleMenu(menu);
+        menu.PlacementTarget = MenuButton;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        menu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    private void PrepareTitleMenu(ContextMenu cm)
+    {
+        var group = ComputeTouchingCluster();
+        var position = group.IndexOf(this);
+        if (FindMenuItemByTag(cm.Items, "Expansion") is MenuItem expansion) expansion.Header = _isCollapsed ? "Expand picket" : "Collapse picket";
+        if (FindMenuItemByTag(cm.Items, "StackMenu") is MenuItem stack)
+        {
+            stack.IsEnabled = group.Count > 1;
+            stack.Header = _stackPageCount > 1 ? $"Stack (page {_stackPageIndex + 1} of {_stackPageCount})" : "Stack";
+        }
+        if (FindMenuItemByTag(cm.Items, "Earlier") is MenuItem earlier) earlier.IsEnabled = position > 0;
+        if (FindMenuItemByTag(cm.Items, "Later") is MenuItem later) later.IsEnabled = position + 1 < group.Count;
+        if (FindMenuItemByTag(cm.Items, "PreviousPage") is MenuItem previous) previous.IsEnabled = _stackPageIndex > 0;
+        if (FindMenuItemByTag(cm.Items, "NextPage") is MenuItem next) next.IsEnabled = _stackPageIndex + 1 < _stackPageCount;
         RefreshSubmenuChecks(cm, "ColorMenu", _colorKey);
         RefreshSubmenuChecks(cm, "TransparencyMenu", _transparencyKey);
         RefreshBlurCheck(cm);
@@ -811,7 +841,7 @@ public partial class PicketWindow : Window
         if (_isRollAnimating) return;
         NormalizeConnectedGroup();
         _resizeCluster = ComputeTouchingCluster();
-        _resizeOrientation = GetSimpleGroupOrientation(_resizeCluster);
+        _resizeOrientation = _groupHorizontal ? GroupOrientation.Row : GroupOrientation.Column;
     }
 
     private void Resize_DragCompleted(object sender, DragCompletedEventArgs e)
@@ -824,7 +854,7 @@ public partial class PicketWindow : Window
     private void ResizeClusterWidth(double requestedChange)
     {
         if (_resizeCluster == null || _resizeCluster.Count == 0) return;
-        var divisor = _resizeOrientation == GroupOrientation.Row ? _resizeCluster.Count : 1;
+        var divisor = _resizeOrientation == GroupOrientation.Row ? Math.Max(1, _resizeCluster.Count(p => p.IsOnStackPage)) : 1;
         var target = Math.Max(Width + requestedChange / divisor, _resizeCluster.Max(p => p.MinWidth));
         foreach (var p in _resizeCluster) p.Width = target;
         ReflowCluster(OrderResizeCluster(), _resizeOrientation);
@@ -834,7 +864,7 @@ public partial class PicketWindow : Window
     {
         if (_resizeCluster == null || _resizeCluster.Count == 0) return;
         var divisor = _resizeOrientation == GroupOrientation.Column
-            ? Math.Max(1, _resizeCluster.Count(p => !p._isCollapsed)) : 1;
+            ? Math.Max(1, _resizeCluster.Count(p => p.IsOnStackPage && !p._isCollapsed)) : 1;
         var target = Math.Max(_expandedHeight + requestedChange / divisor, 96);
         foreach (var p in _resizeCluster)
         {
@@ -1017,6 +1047,7 @@ public partial class PicketWindow : Window
         if (Application.Current is not App app) return false;
         foreach (var picket in app.Pickets)
         {
+            if (!picket.IsVisible || !picket.IsOnStackPage) continue;
             var hwnd = new WindowInteropHelper(picket).Handle;
             if (hwnd == IntPtr.Zero || !WindowInterop.GetWindowRect(hwnd, out var rect)) continue;
             if (point.X >= rect.left && point.X < rect.right &&

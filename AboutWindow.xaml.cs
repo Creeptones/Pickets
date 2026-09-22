@@ -5,7 +5,7 @@ using System.Windows;
 
 namespace Pickets;
 
-public partial class AboutWindow : Window
+public partial class AboutWindow : AccessibleDialogWindow
 {
     public AboutWindow()
     {

@@ -42,14 +42,16 @@ public sealed class TrayIcon : IDisposable
         menu.Items.Add(new ToolStripSeparator());
 
         // "&&" renders as a literal ampersand (a single "&" would become a mnemonic underline).
-        var runAtLogin = new ToolStripMenuItem("Run at login");
+        var runAtLogin = new ToolStripMenuItem("Start at sign-in");
         runAtLogin.Click += (_, _) => setRunAtLogin(!runAtLogin.Checked);
         menu.Items.Add(runAtLogin);
         menu.Items.Add(new ToolStripMenuItem("About Pickets...", null, (_, _) => onAbout()));
 
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("Release all icons && quit...", null, (_, _) => onReleaseAndQuit()));
-        menu.Items.Add(new ToolStripMenuItem("Exit and keep icons hidden", null, (_, _) => onExitHidden()));
+        var advanced = new ToolStripMenuItem("Advanced");
+        advanced.DropDownItems.Add(new ToolStripMenuItem("Release all icons && quit...", null, (_, _) => onReleaseAndQuit()));
+        advanced.DropDownItems.Add(new ToolStripMenuItem("Exit and keep icons hidden", null, (_, _) => onExitHidden()));
+        menu.Items.Add(advanced);
         menu.Items.Add(new ToolStripMenuItem("Quit Pickets...", null, (_, _) => onQuit()));
 
         // Sync the checkmark to actual registry state every time the menu opens, so a change made

@@ -46,10 +46,17 @@ public class PicketItem : INotifyPropertyChanged
     public ReferenceStatus Status => _status;
     public string StatusText => _status switch
     {
-        ReferenceStatus.Checking => "Checking availability…",
-        ReferenceStatus.Missing => "Not found — locate or check again",
-        ReferenceStatus.Unavailable => "Unavailable — reconnect or check again",
+        ReferenceStatus.Checking => "Checking…",
+        ReferenceStatus.Missing => "Not found",
+        ReferenceStatus.Unavailable => "Unavailable",
         _ => "",
+    };
+    public string ReferenceHelp => _status switch
+    {
+        ReferenceStatus.Checking => Path + "\nChecking availability in the background.",
+        ReferenceStatus.Missing => Path + "\nThe reference is saved. Use Check again or Locate… if it moved.",
+        ReferenceStatus.Unavailable => Path + "\nThe reference is saved. Reconnect its drive or share, then choose Check again.",
+        _ => Path,
     };
     public string AccessibleName => Kind == ItemKind.Label ? LabelText
         : string.IsNullOrEmpty(StatusText) ? DisplayName : $"{DisplayName}, {StatusText}";
@@ -122,29 +129,40 @@ public class PicketItem : INotifyPropertyChanged
         _status = status;
         OnPropertyChanged(nameof(Status));
         OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(ReferenceHelp));
         OnPropertyChanged(nameof(IsMissing));
         OnPropertyChanged(nameof(AccessibleName));
         OnPropertyChanged(nameof(CellHeight));
     }
 
     private Task? _refreshTask;
+    internal System.Func<string, Task<ReferenceCheck>> Probe { get; init; } = FileReferenceProbe.CheckAsync;
+    internal System.Func<string, Task<BitmapSource?>> ThumbnailLoader { get; init; } = ShellIconExtractor.GetIconAsync;
     internal Task RefreshAsync() => _refreshTask is { IsCompleted: false } ? _refreshTask : _refreshTask = RefreshCoreAsync();
+    private Task? _thumbnailTask;
 
     private async Task RefreshCoreAsync()
     {
         SetStatus(ReferenceStatus.Checking);
-        var result = await FileReferenceProbe.CheckAsync(Path);
+        var result = await Probe(Path);
         if (result.Status == ReferenceStatus.Available)
         {
             IsFolder = result.IsFolder;
             OnPropertyChanged(nameof(IsFolder));
         }
         SetStatus(result.Status);
-        if (result.Status == ReferenceStatus.Available && Icon == null)
+        if (result.Status == ReferenceStatus.Available && Icon == null && _thumbnailTask is not { IsCompleted: false })
+            _thumbnailTask = RefreshThumbnailAsync();
+    }
+
+    private async Task RefreshThumbnailAsync()
+    {
+        try
         {
-            Icon = await ShellIconExtractor.GetIconAsync(Path);
+            Icon = await ThumbnailLoader(Path);
             OnPropertyChanged(nameof(Icon));
         }
+        catch (System.Exception ex) { Logger.Log("Thumbnail unavailable: " + ex.Message); }
     }
 
     public static PicketItem CreateLabel(string text)

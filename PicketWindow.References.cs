@@ -64,6 +64,13 @@ public partial class PicketWindow
         if (sender is MenuItem { DataContext: PicketItem item }) await item.RefreshAsync();
     }
 
+    private void ItemMenu_Locate_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: PicketItem item }) return;
+        if (item.IsFolder) ItemMenu_LocateFolder_Click(sender, e);
+        else ItemMenu_LocateFile_Click(sender, e);
+    }
+
     private void ItemMenu_LocateFile_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem { DataContext: PicketItem item }) return;
@@ -130,7 +137,7 @@ public partial class PicketWindow
         await item.RefreshAsync();
         if (item.IsMissing)
         {
-            MessageBox.Show($"This reference is currently unavailable:\n{item.Path}\n\nReconnect its drive or network location and choose Check again. If it moved, use Locate file or Locate folder. The reference is still saved.",
+            MessageBox.Show($"This reference is currently unavailable:\n{item.Path}\n\nReconnect its drive or network location and choose Check again. If it moved, use Locate…. The reference is still saved.",
                 "Pickets", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }

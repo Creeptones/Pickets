@@ -18,26 +18,34 @@
         <ContextMenu x:Key="ItemContextMenu" DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
             <MenuItem Header="Open" Click="ItemMenu_Open_Click"/>
             <MenuItem Header="Check again" Click="ItemMenu_Check_Click"/>
-            <MenuItem Header="Locate file..." Click="ItemMenu_LocateFile_Click"/>
-            <MenuItem Header="Locate folder..." Click="ItemMenu_LocateFolder_Click"/>
+            <MenuItem Header="Locate..." Click="ItemMenu_Locate_Click"/>
             <MenuItem Header="Open file location" Click="ItemMenu_OpenLocation_Click"/>
             <MenuItem Header="Move reference to" Tag="MoveReferenceTo"/>
-            <MenuItem Header="Large icon (2x2)" Tag="LargeToggle" IsCheckable="True" Click="ItemMenu_ToggleLarge_Click"/>
+            <MenuItem Header="Large icon" Tag="LargeToggle" IsCheckable="True" Click="ItemMenu_ToggleLarge_Click"/>
             <Separator/>
             <MenuItem Header="Insert label above..." Click="ItemMenu_InsertLabelAbove_Click"/>
-            <MenuItem Header="Remove reference (never deletes the file)" Click="ItemMenu_Remove_Click"/>
+            <MenuItem Header="Remove from picket" Click="ItemMenu_Remove_Click"/>
         </ContextMenu>
         <ContextMenu x:Key="LabelContextMenu" DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
             <MenuItem Header="Rename label..." Click="LabelMenu_Rename_Click"/>
             <MenuItem Header="Remove label" Click="LabelMenu_Remove_Click"/>
         </ContextMenu>
         <ContextMenu x:Key="TitleContextMenu">
-            <MenuItem Header="Rename picket..." Click="TitleMenu_Rename_Click"/>
-            <MenuItem Header="Roll up / down" Click="TitleMenu_ToggleCollapse_Click"/>
-            <MenuItem Header="Accordion: one section open" Tag="Accordion" IsCheckable="True" Click="TitleMenu_Accordion_Click"/>
-            <MenuItem Header="Move section earlier" Click="MoveSectionEarlier_Click"/>
-            <MenuItem Header="Move section later" Click="MoveSectionLater_Click"/>
-            <MenuItem Header="Unlink section" Click="UnlinkBtn_Click"/>
+            <MenuItem Header="Add files..." InputGestureText="Ctrl+O" Click="AddFiles_Click"/>
+            <MenuItem Header="Add folders..." InputGestureText="Ctrl+Shift+O" Click="AddFolder_Click"/>
+            <MenuItem Header="Add label..." Click="TitleMenu_AddLabel_Click"/>
+            <Separator/>
+            <MenuItem Header="Rename picket..." InputGestureText="F2" Click="TitleMenu_Rename_Click"/>
+            <MenuItem Header="Collapse picket" Tag="Expansion" Click="TitleMenu_ToggleCollapse_Click"/>
+            <MenuItem Header="Stack" Tag="StackMenu">
+                <MenuItem Header="Open one picket at a time" Tag="Accordion" IsCheckable="True" Click="TitleMenu_Accordion_Click"/>
+                <MenuItem Header="Move picket earlier" Tag="Earlier" Click="MoveSectionEarlier_Click"/>
+                <MenuItem Header="Move picket later" Tag="Later" Click="MoveSectionLater_Click"/>
+                <MenuItem Header="Detach this picket" Click="UnlinkBtn_Click"/>
+                <Separator/>
+                <MenuItem Header="Previous page" Tag="PreviousPage" InputGestureText="Ctrl+PageUp" Click="PreviousStackPage_Click"/>
+                <MenuItem Header="Next page" Tag="NextPage" InputGestureText="Ctrl+PageDown" Click="NextStackPage_Click"/>
+            </MenuItem>
             <MenuItem Header="Appearance">
                 <MenuItem Header="Color" Tag="ColorMenu">
                 <MenuItem Header="Porcelain" Tag="porcelain" IsCheckable="True" Click="TitleMenu_SetColor_Click">
@@ -89,25 +97,22 @@
                 <MenuItem Header="Blur background" Tag="BlurToggle" IsCheckable="True" Click="TitleMenu_ToggleBlur_Click"/>
             </MenuItem>
             <Separator/>
-            <MenuItem Header="Add files..." InputGestureText="Ctrl+O" Click="AddFiles_Click"/>
-            <MenuItem Header="Add folders..." InputGestureText="Ctrl+Shift+O" Click="AddFolder_Click"/>
-            <MenuItem Header="Add section label..." Click="TitleMenu_AddLabel_Click"/>
-            <MenuItem Header="New picket here" Click="TitleMenu_NewPicket_Click"/>
-            <MenuItem Header="Delete this picket" Click="TitleMenu_DeletePicket_Click"/>
-            <MenuItem Header="Settings">
-                <MenuItem Header="Check reference availability" Click="TitleMenu_CleanMissing_Click"/>
-                <Separator/>
-                <MenuItem Header="Hide / show all pickets" Click="TitleMenu_HideAll_Click"/>
-                <MenuItem Header="Keyboard help..." InputGestureText="F1" Click="KeyboardHelp_Click"/>
+            <MenuItem Header="New picket" InputGestureText="Ctrl+N" Click="TitleMenu_NewPicket_Click"/>
+            <MenuItem Header="Delete this picket..." Click="TitleMenu_DeletePicket_Click"/>
+            <MenuItem Header="Settings and help">
+                <MenuItem Header="Check all references" Click="TitleMenu_CleanMissing_Click"/>
                 <MenuItem Header="Change focus shortcut..." Click="ShortcutSettings_Click"/>
-                <MenuItem Header="Launch at login" Tag="LaunchAtLogin" IsCheckable="True" Click="TitleMenu_ToggleLaunchAtLogin_Click"/>
+                <MenuItem Header="Start at sign-in" Tag="LaunchAtLogin" IsCheckable="True" Click="TitleMenu_ToggleLaunchAtLogin_Click"/>
                 <Separator/>
+                <MenuItem Header="Keyboard help..." InputGestureText="F1" Click="KeyboardHelp_Click"/>
                 <MenuItem Header="About Pickets..." Click="TitleMenu_About_Click"/>
-                <Separator/>
-                <MenuItem Header="Release all icons and quit..." Click="TitleMenu_RestoreAll_Click"/>
-                <MenuItem Header="Exit and keep icons hidden" Click="TitleMenu_ExitHidden_Click"/>
+                <MenuItem Header="Advanced">
+                    <MenuItem Header="Release all icons and quit..." Click="TitleMenu_RestoreAll_Click"/>
+                    <MenuItem Header="Exit and keep icons hidden" Click="TitleMenu_ExitHidden_Click"/>
+                </MenuItem>
             </MenuItem>
             <Separator/>
+            <MenuItem Header="Hide Pickets" Click="TitleMenu_HideAll_Click"/>
             <MenuItem Header="Quit Pickets..." Click="TitleMenu_Quit_Click"/>
         </ContextMenu>
 
@@ -178,8 +183,11 @@
                             ContextMenu="{StaticResource TitleContextMenu}" ContextMenuOpening="TitleBar_ContextMenuOpening"
                             HorizontalContentAlignment="Left" Padding="8,0,2,0"
                             PreviewMouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Click="TitleToggle_Click"
-                            AutomationProperties.HelpText="Expand or collapse this section. F2 renames. F1 opens keyboard help.">
-                            <TextBlock x:Name="TitleText" Text="Picket" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            AutomationProperties.HelpText="Expand or collapse this picket. Drag the title to move its stack. F2 renames; F1 opens help.">
+                            <DockPanel LastChildFill="True">
+                                <TextBlock x:Name="ExpansionChevron" DockPanel.Dock="Left" Text="⌄" Width="18" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TitleText" Text="Picket" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            </DockPanel>
                         </local:PicketHeaderButton>
                         <TextBox x:Name="TitleEditBox" Grid.Column="0" Visibility="Collapsed"
                             VerticalAlignment="Center" Margin="10,1,4,1"
@@ -190,9 +198,14 @@
                             KeyDown="TitleEditBox_KeyDown" LostFocus="TitleEditBox_LostFocus"/>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
                             <Button x:Name="UnlinkBtn" Width="24" Height="26" Style="{StaticResource HeaderButton}" Content="↗"
-                                AutomationProperties.Name="Unlink section" ToolTip="Unlink section" Visibility="Collapsed" Click="UnlinkBtn_Click"/>
-                            <Button x:Name="AddPicketBtn" Width="24" Height="26" Style="{StaticResource HeaderButton}" Content="+"
-                                AutomationProperties.Name="New picket" ToolTip="New picket (Ctrl+N)" Click="AddPicketBtn_Click"/>
+                                AutomationProperties.Name="Detach picket" ToolTip="Detach this picket from its stack" Visibility="Collapsed" Click="UnlinkBtn_Click"/>
+                            <Button x:Name="PreviousPageButton" Width="24" Height="26" Style="{StaticResource HeaderButton}" Content="‹" Visibility="Collapsed"
+                                AutomationProperties.Name="Previous stack page" Click="PreviousStackPage_Click"/>
+                            <Button x:Name="NextPageButton" Width="24" Height="26" Style="{StaticResource HeaderButton}" Content="›" Visibility="Collapsed"
+                                AutomationProperties.Name="Next stack page" Click="NextStackPage_Click"/>
+                            <Button x:Name="MenuButton" Width="26" Height="26" Style="{StaticResource HeaderButton}" Content="⋯"
+                                ContextMenu="{StaticResource TitleContextMenu}" ContextMenuOpening="TitleBar_ContextMenuOpening"
+                                AutomationProperties.Name="Picket menu" ToolTip="Picket menu: add files, customize, and create pickets" Click="MenuButton_Click"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -203,6 +216,7 @@
                               DragOver="ItemsHost_DragOver"
                               Background="Transparent"
                               MouseLeftButtonDown="BodyScroll_MouseLeftButtonDown">
+                    <Grid>
                     <ListBox x:Name="ItemsHost" Margin="4" SelectionMode="Extended" BorderThickness="0" Background="Transparent"
                         AutomationProperties.Name="Picket references" KeyboardNavigation.TabNavigation="Once"
                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
@@ -210,7 +224,7 @@
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
                                 <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}"/>
-                                <Setter Property="AutomationProperties.HelpText" Value="{Binding Path}"/>
+                                <Setter Property="AutomationProperties.HelpText" Value="{Binding ReferenceHelp}"/>
                                 <Setter Property="ContextMenu" Value="{StaticResource ItemContextMenu}"/>
                                 <Setter Property="Foreground" Value="{DynamicResource PicketItemForeground}"/>
                                 <EventSetter Event="PreviewMouseLeftButtonDown" Handler="Item_MouseDown"/>
@@ -243,7 +257,7 @@
                         </ListBox.ItemContainerStyle>
                         <ListBox.Resources>
                             <DataTemplate x:Key="FileItemTemplate">
-                                <StackPanel MinHeight="{Binding CellHeight}" ToolTip="{Binding Path}"
+                                <StackPanel MinHeight="{Binding CellHeight}" ToolTip="{Binding ReferenceHelp}"
                                     TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}">
                                     <StackPanel.Width>
                                         <MultiBinding Converter="{StaticResource CellWidthConverter}">
@@ -276,11 +290,33 @@
                         <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>
                         <ListBox.ItemTemplateSelector><StaticResource ResourceKey="ItemSelector"/></ListBox.ItemTemplateSelector>
                     </ListBox>
+                    <StackPanel x:Name="EmptyState" Margin="14,18" HorizontalAlignment="Stretch" TextElement.Foreground="{DynamicResource PicketItemForeground}">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding HasItems, ElementName=ItemsHost}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Text="Drop files here" FontWeight="SemiBold" FontSize="16" TextWrapping="Wrap"/>
+                        <TextBlock Text="Your files stay where they are." TextWrapping="Wrap" Margin="0,5,0,12"/>
+                        <WrapPanel>
+                            <Button Content="Add files…" Click="AddFiles_Click" Padding="8,5" Margin="0,0,6,6" Style="{StaticResource HeaderButton}" Background="{DynamicResource PicketSectionBackground}"/>
+                            <Button Content="Add folders…" Click="AddFolder_Click" Padding="8,5" Margin="0,0,0,6" Style="{StaticResource HeaderButton}" Background="{DynamicResource PicketSectionBackground}"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    </Grid>
                 </ScrollViewer>
             </DockPanel>
         </Border>
 
-        <!-- Invisible resize thumbs (Opacity=0 keeps them hit-testable). -->
+        <TextBlock x:Name="ResizeHint" Text="◢" FontSize="12" Foreground="{DynamicResource PicketFocusBorder}"
+            HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,2,0" IsHitTestVisible="False">
+            <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Opacity" Value="0"/><Style.Triggers>
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"><Setter Property="Opacity" Value="0.7"/></DataTrigger>
+                <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"><Setter Property="Opacity" Value="0.7"/></DataTrigger>
+            </Style.Triggers></Style></TextBlock.Style>
+        </TextBlock>
+        <!-- Invisible resize hit areas sit over the visible hover/focus hint. -->
         <Thumb x:Name="ResizeRight"
                HorizontalAlignment="Right" VerticalAlignment="Stretch"
                Width="6" Cursor="SizeWE" Opacity="0"

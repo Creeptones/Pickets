@@ -6,6 +6,7 @@ namespace Pickets;
 
 public partial class App
 {
+    internal string CurrentFocusShortcut => _layout.FocusShortcut;
     private void MenuAccessibilityChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(SystemParameters.HighContrast)) Dispatcher.Invoke(ApplyMenuPalette);
@@ -39,14 +40,14 @@ public partial class App
     private void FocusOrHidePickets()
     {
         if (_pickets.Any(p => p.IsKeyboardFocusWithin))
-            foreach (var picket in _pickets) picket.Hide();
+            HidePickets();
         else FocusPickets();
     }
 
     internal void FocusPickets()
     {
-        foreach (var picket in _pickets) picket.Show();
-        _pickets.FirstOrDefault()?.FocusForKeyboard();
+        ShowPickets();
+        _pickets.FirstOrDefault(p => p.IsOnStackPage)?.FocusForKeyboard();
     }
 
     internal void FocusNextPicket(PicketWindow current, int direction)

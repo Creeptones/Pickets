@@ -16,7 +16,7 @@ public static class InputDialog
         {
             Text = initialText,
             Margin = new Thickness(0, 4, 0, 8),
-            MinWidth = 280,
+            MinWidth = 220,
         };
 
         var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 72, Margin = new Thickness(4, 0, 0, 0) };
@@ -28,16 +28,16 @@ public static class InputDialog
 
         var root = new StackPanel { Margin = new Thickness(12) };
         System.Windows.Automation.AutomationProperties.SetName(textBox, prompt);
-        root.Children.Add(new TextBlock { Text = prompt });
+        root.Children.Add(new TextBlock { Text = prompt, TextWrapping = TextWrapping.Wrap });
         root.Children.Add(textBox);
         root.Children.Add(buttons);
 
-        var dialog = new Window
+        var dialog = new AccessibleDialogWindow
         {
             Title = title,
-            Content = root,
-            SizeToContent = SizeToContent.WidthAndHeight,
-            ResizeMode = ResizeMode.NoResize,
+            Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled },
+            Width = 460, Height = 240,
+            ResizeMode = ResizeMode.CanResize,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Owner = owner,
             ShowInTaskbar = false,

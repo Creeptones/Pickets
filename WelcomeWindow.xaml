@@ -1,29 +1,16 @@
-<Window x:Class="Pickets.WelcomeWindow"
+<local:AccessibleDialogWindow x:Class="Pickets.WelcomeWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Pickets"
         Title="Welcome to Pickets"
         Width="590" Height="610"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize"
-        ShowInTaskbar="False"
-        Background="#FF17191D"
-        Foreground="#FFF4F5F7"
+        ShowInTaskbar="True"
+        Background="{DynamicResource DialogBackground}"
+        Foreground="{DynamicResource DialogForeground}"
         FontFamily="Segoe UI">
-    <Window.Resources>
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="#FF2E759C"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#FF589BD5"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="18,9"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-        <Style TargetType="CheckBox">
-            <Setter Property="Foreground" Value="#FFF4F5F7"/>
-            <Setter Property="Margin" Value="0,5,0,0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-        </Style>
-    </Window.Resources>
+
 
     <Grid Margin="24">
         <Grid.RowDefinitions>
@@ -36,7 +23,7 @@
         <StackPanel Margin="0,0,12,0">
         <StackPanel Margin="0,0,0,18">
             <TextBlock Text="Welcome to Pickets" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap"/>
-            <TextBlock Margin="0,6,0,0" Foreground="#FFAFB7C2" FontSize="14" TextWrapping="Wrap"
+            <TextBlock Margin="0,6,0,0" Foreground="{DynamicResource DialogMuted}" FontSize="14" TextWrapping="Wrap"
                        Text="Your desktop, organized without moving your files."/>
         </StackPanel>
 
@@ -46,44 +33,44 @@
                 <ToggleButton x:Name="DesktopHelpButton"
                               Margin="8,0,0,0" Width="22" Height="22"
                               Padding="0" Content="?" FontSize="13" FontWeight="Bold"
-                              Background="#FF24282E" Foreground="#FFD8E5EE"
-                              BorderBrush="#FF53616D" BorderThickness="1"
+                              Background="{DynamicResource DialogSurface}" Foreground="{DynamicResource DialogForeground}"
+                              BorderBrush="{DynamicResource DialogBorder}" BorderThickness="1"
                               Cursor="Hand" ToolTip="Why are these settings required?"
                               AutomationProperties.Name="Why desktop settings are required"/>
             </StackPanel>
             <Popup IsOpen="{Binding IsChecked, ElementName=DesktopHelpButton, Mode=TwoWay}"
                    PlacementTarget="{Binding ElementName=DesktopHelpButton}"
                    Placement="Bottom" HorizontalOffset="6" VerticalOffset="4"
-                   AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False">
+                   AllowsTransparency="True" PopupAnimation="None" StaysOpen="False">
                 <Border Width="410" MaxWidth="{Binding ActualWidth, ElementName=OnboardingContent}" Padding="15" CornerRadius="7"
-                        Background="#FF24282E" BorderBrush="#FF53616D" BorderThickness="1">
+                        Background="{DynamicResource DialogSurface}" BorderBrush="{DynamicResource DialogBorder}" BorderThickness="1">
                     <StackPanel>
                         <TextBlock Text="Why Pickets needs this" FontSize="14" FontWeight="SemiBold"
-                                   Foreground="#FFF4F5F7"/>
-                        <TextBlock Margin="0,7,0,0" TextWrapping="Wrap" Foreground="#FFD1D6DD"
+                                   Foreground="{DynamicResource DialogForeground}"/>
+                        <TextBlock Margin="0,7,0,0" TextWrapping="Wrap" Foreground="{DynamicResource DialogMuted}"
                                    Text="Pickets keeps your files in place. It remembers each captured desktop icon's exact position, hides that icon, and shows it inside a picket instead."/>
-                        <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#FFD1D6DD"
+                        <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="{DynamicResource DialogMuted}"
                                    Text="Auto arrange and Align icons to grid let Windows reposition icons on its own. That can make captured icons reappear, jump, or lose their original spots. Turning both off lets Pickets restore everything exactly where it started."/>
                     </StackPanel>
                 </Border>
             </Popup>
-            <TextBlock Margin="28,3,0,8" Foreground="#FFD1D6DD" TextWrapping="Wrap"
+            <TextBlock Margin="28,3,0,8" Foreground="{DynamicResource DialogMuted}" TextWrapping="Wrap"
                        Text="Right-click the desktop, open View, and turn both options off. Pickets will check them for you."/>
             <StackPanel Margin="28,0,0,0">
-                <Border Margin="0,0,0,6" Padding="10,7" CornerRadius="5" Background="#FF24282E">
+                <Border Margin="0,0,0,6" Padding="10,7" CornerRadius="5" Background="{DynamicResource DialogSurface}">
                     <DockPanel>
                         <Ellipse x:Name="AutoArrangeIndicator" Width="9" Height="9" Margin="0,0,8,0" VerticalAlignment="Center"/>
                         <TextBlock x:Name="AutoArrangeStatus" VerticalAlignment="Center" TextWrapping="Wrap"/>
                     </DockPanel>
                 </Border>
-                <Border Margin="0,0,0,6" Padding="10,7" CornerRadius="5" Background="#FF24282E">
+                <Border Margin="0,0,0,6" Padding="10,7" CornerRadius="5" Background="{DynamicResource DialogSurface}">
                     <DockPanel>
                         <Ellipse x:Name="SnapToGridIndicator" Width="9" Height="9" Margin="0,0,8,0" VerticalAlignment="Center"/>
                         <TextBlock x:Name="SnapToGridStatus" VerticalAlignment="Center" TextWrapping="Wrap"/>
                     </DockPanel>
                 </Border>
                 <Button Content="Check again" HorizontalAlignment="Left" Padding="12,6" Click="Recheck_Click"/>
-                <TextBlock x:Name="ReadinessHint" Margin="0,8,0,0" Foreground="#FFD1D6DD" TextWrapping="Wrap"
+                <TextBlock x:Name="ReadinessHint" Margin="0,8,0,0" Foreground="{DynamicResource DialogMuted}" TextWrapping="Wrap"
                            AutomationProperties.LiveSetting="Polite"/>
             </StackPanel>
 
@@ -91,23 +78,23 @@
             <StackPanel Margin="28,3,0,0">
                 <CheckBox x:Name="CreateShortcutCheck"><TextBlock Text="Create a Pickets shortcut on my desktop" TextWrapping="Wrap"/></CheckBox>
                 <CheckBox x:Name="RunAtLoginCheck"><TextBlock Text="Start Pickets when I sign in" TextWrapping="Wrap"/></CheckBox>
-                <TextBlock Margin="0,6,0,0" Foreground="#FF8F99A6" FontSize="12" TextWrapping="Wrap"
+                <TextBlock Margin="0,6,0,0" Foreground="{DynamicResource DialogMuted}" FontSize="12" TextWrapping="Wrap"
                            Text="Tip: keep Pickets.exe in a permanent folder before enabling these options."/>
             </StackPanel>
 
-            <TextBlock Margin="0,20,0,0" FontSize="16" FontWeight="SemiBold" Text="3   Three useful moves"/>
+            <TextBlock Margin="0,20,0,0" FontSize="16" FontWeight="SemiBold" Text="3   Start with one picket"/>
             <StackPanel Margin="28,3,0,0">
-                <TextBlock Foreground="#FFD1D6DD" Text="Drag desktop icons into a picket to organize them." TextWrapping="Wrap"/>
-                <TextBlock Margin="0,4,0,0" Foreground="#FFD1D6DD" Text="Click a title to roll it up; drag the title to move the group." TextWrapping="Wrap"/>
-                <TextBlock Margin="0,4,0,0" Foreground="#FFD1D6DD" Text="Ctrl+Alt+D focuses Pickets by default; press again while focused to hide. Change the shortcut or open keyboard help from the tray." TextWrapping="Wrap"/>
+                <TextBlock Foreground="{DynamicResource DialogMuted}" Text="Use Add files or Add folders in an empty picket to save references. You can also drag desktop icons in to hide their desktop duplicates." TextWrapping="Wrap"/>
+                <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource DialogMuted}" Text="Click a title to roll it up; drag the title to move the group." TextWrapping="Wrap"/>
+                <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource DialogMuted}" Text="Ctrl+Alt+D focuses Pickets by default; press again while focused to hide. Change the shortcut or open keyboard help from the tray." TextWrapping="Wrap"/>
             </StackPanel>
         </StackPanel>
         </ScrollViewer>
 
         <StackPanel Grid.Row="1" Margin="0,12,0,0">
-            <TextBlock Margin="0,0,0,8" Foreground="#FF8F99A6" TextWrapping="Wrap"
+            <TextBlock Margin="0,0,0,8" Foreground="{DynamicResource DialogMuted}" TextWrapping="Wrap"
                        Text="Reopen this guide anytime from the tray menu."/>
-            <Button x:Name="GetStartedButton" HorizontalAlignment="Right" Content="Start using Pickets" IsDefault="True" Click="GetStarted_Click"/>
+            <Button x:Name="GetStartedButton" HorizontalAlignment="Right" Content="Start using Pickets" IsDefault="True" IsEnabled="False" Click="GetStarted_Click"/>
         </StackPanel>
     </Grid>
-</Window>
+</local:AccessibleDialogWindow>

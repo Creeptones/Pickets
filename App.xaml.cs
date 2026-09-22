@@ -212,10 +212,11 @@ public partial class App : Application
     /// attempt, so re-running the app feels like "focus the existing one" rather than a silent no-op.</summary>
     private void SurfaceAllPickets()
     {
+        PicketsHidden = false;
         foreach (var f in _pickets)
         {
-            f.Show();
-            f.Activate();
+            f.ShowIfOnStackPage();
+            if (f.IsOnStackPage) f.Activate();
         }
         _tray?.ShowBalloon("Pickets is already running",
             "Your pickets are on the desktop. Use the tray icon to hide them or quit.");
@@ -229,7 +230,7 @@ public partial class App : Application
         Logger.Log("Explorer restarted -- respawning pickets onto the new WorkerW.");
         var states = _pickets.Select(f => f.ToState()).ToList();
         foreach (var f in _pickets.ToList())
-            f.Close();
+            f.CloseForLayoutChange();
         _pickets.Clear();
 
         foreach (var state in states)
@@ -366,7 +367,7 @@ public partial class App : Application
 
         // Close current picket windows -- positions in the new monitor space differ entirely.
         foreach (var f in _pickets.ToList())
-            f.Close();
+            f.CloseForLayoutChange();
         _pickets.Clear();
 
         _activeProfile = newKey;
@@ -447,15 +448,36 @@ public partial class App : Application
     }
 
     /// <summary>If any picket is visible, hides them all; otherwise shows them all.</summary>
+    internal bool PicketsHidden { get; private set; }
+    internal bool IsShuttingDown { get; private set; }
+
+    public new void Shutdown() { IsShuttingDown = true; base.Shutdown(); }
+    public new void Shutdown(int exitCode) { IsShuttingDown = true; base.Shutdown(exitCode); }
+
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        IsShuttingDown = true;
+        base.OnSessionEnding(e);
+    }
+
+    internal void HidePickets(bool explain = false)
+    {
+        PicketsHidden = true;
+        foreach (var picket in _pickets) picket.Hide();
+        if (explain) _tray?.ShowBalloon("Pickets is hidden",
+            "Pickets is still running. Use the tray or focus shortcut to return; choose Quit to restore desktop icons.");
+    }
+
+    internal void ShowPickets()
+    {
+        PicketsHidden = false;
+        foreach (var picket in _pickets) picket.ShowIfOnStackPage();
+    }
+
     public void ToggleAllPicketsVisibility()
     {
-        if (_pickets.Count == 0) return;
-        var anyVisible = _pickets.Any(f => f.IsVisible);
-        foreach (var f in _pickets)
-        {
-            if (anyVisible) f.Hide();
-            else            f.Show();
-        }
+        if (_pickets.Any(f => f.IsVisible)) HidePickets();
+        else ShowPickets();
     }
 
     private void MarkDirty()
@@ -508,7 +530,7 @@ public partial class App : Application
     {
         if (!picket.TryReleaseAllReferences()) return;
         _pickets.Remove(picket);
-        picket.Close();
+        picket.CloseForLayoutChange();
         _pickets.FirstOrDefault(p => p.GroupId == picket.GroupId)?.NormalizeConnectedGroup();
         MarkDirty();
     }
@@ -520,6 +542,7 @@ public partial class App : Application
         picket.LayoutChanged += (_, _) => MarkDirty();
         _pickets.Add(picket);
         picket.Show();
+        if (PicketsHidden) picket.Hide();
         // Spawning a new picket may already overlap an existing one -- refresh everyone's link state.
         foreach (var f in _pickets) f.RefreshLinkState();
         return picket;
