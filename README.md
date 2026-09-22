@@ -97,5 +97,4 @@ Review any logs or screenshots for private paths before sharing.
 [Build instructions](docs/BUILDING.md) · [Changelog](CHANGELOG.md) ·
 [Release checklist](docs/RELEASE_CHECKLIST.md) · [Security policy](SECURITY.md)
 
-[MIT License](LICENSE). Pickets is independent and not affiliated with Stardock.
-“Fences” is a trademark of Stardock Corporation.
+[MIT License](LICENSE).
