@@ -145,5 +145,6 @@ of the dragged file and its native window was enabled with an OLE drop target re
 An isolated test of the real controls with six references and a label accepted drops across the body.
 After restarting into diagnostic build `6a8a009`, the user reported that Programs worked again.
 The trace confirms Link acceptance for incoming files over the grid, item borders, scroll viewer,
-and label text. This records recovery after restart, not a confirmed root-cause fix. Repeat after
-collapse/expand and normal use before closing this intermittent issue; retain the drop trace if it recurs.
+and label text. The user then passed three collapse/reopen cycles followed by another drag into
+Programs. The issue did not recur in that check; its root cause remains unconfirmed. Retain the
+drop trace and investigate if it recurs during normal use.
