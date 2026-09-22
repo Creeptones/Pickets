@@ -222,6 +222,7 @@ public partial class PicketWindow
             return;
         }
         var start = group.Select(p => new Rect(p.Left, p.Top, p.Width, p.Height)).ToArray();
+        var startAngles = group.Select(p => p.ChevronRotation.Angle).ToArray();
         var first = group[0];
         var dpi = VisualTreeHelper.GetDpi(first);
         var target = StackLayout.Arrange(new Point(first.Left, first.Top), first.Width, first._expandedHeight,
@@ -263,6 +264,8 @@ public partial class PicketWindow
                 p.Left = start[i].Left + (target[i].Left - start[i].Left) * eased;
                 p.Top = start[i].Top + (target[i].Top - start[i].Top) * eased;
                 p.Height = start[i].Height + (target[i].Height - start[i].Height) * eased;
+                var targetAngle = states[i] ? 0 : 90;
+                p.ChevronRotation.Angle = startAngles[i] + (targetAngle - startAngles[i]) * eased;
             }
             if (progress >= 1) Finish();
         };
@@ -273,7 +276,7 @@ public partial class PicketWindow
     {
         BodyScroll.Visibility = _isCollapsed ? Visibility.Collapsed : Visibility.Visible;
         TitleToggle.IsExpanded = !_isCollapsed;
-        ExpansionChevron.Text = _isCollapsed ? "›" : "⌄";
+        ChevronRotation.Angle = _isCollapsed ? 0 : 90;
         TitleToggle.ToolTip = _isCollapsed ? "Expand picket; drag to move stack" : "Collapse picket; drag to move stack";
     }
 

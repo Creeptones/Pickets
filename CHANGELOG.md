@@ -34,6 +34,8 @@ Set the publication date when those checks pass and the release is published.
 
 ### Changed
 
+- One consistently sized vector chevron rotates with the stack's expand/collapse animation,
+  respecting Windows reduced-motion preferences.
 - Simplified reference and stack terminology; advanced recovery actions are separated from everyday controls.
 - Normal Quit restores desktop icons while retaining ownership for the next launch.
 - Former folder portals migrate to ordinary folder shortcuts.

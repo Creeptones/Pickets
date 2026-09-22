@@ -184,7 +184,17 @@
                             PreviewMouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Click="TitleToggle_Click"
                             AutomationProperties.HelpText="Expand or collapse this picket. Drag the title to move its stack. F2 renames; F1 opens help.">
                             <DockPanel LastChildFill="True">
-                                <TextBlock x:Name="ExpansionChevron" DockPanel.Dock="Left" Text="⌄" Width="18" VerticalAlignment="Center"/>
+                                <Grid DockPanel.Dock="Left" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center"
+                                      IsHitTestVisible="False">
+                                    <Path x:Name="ExpansionChevron" Data="M 4,2 L 8,6 L 4,10"
+                                          Stroke="{DynamicResource PicketTitleForeground}" StrokeThickness="1.5"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                          RenderTransformOrigin="0.5,0.5">
+                                        <Path.RenderTransform>
+                                            <RotateTransform x:Name="ChevronRotation" Angle="90"/>
+                                        </Path.RenderTransform>
+                                    </Path>
+                                </Grid>
                                 <TextBlock x:Name="TitleText" Text="Picket" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                             </DockPanel>
                         </local:PicketHeaderButton>
