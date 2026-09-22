@@ -32,6 +32,8 @@ public class LayoutFile
 
     /// <summary>Prevents the compact first-run guide from reappearing after it is acknowledged.</summary>
     public bool HasCompletedOnboarding { get; set; }
+
+    public string FocusShortcut { get; set; } = "Ctrl+Alt+D";
 }
 
 /// <summary>A picket's visual style, kept global (shared by every display profile).</summary>
@@ -52,6 +54,11 @@ public class PicketState
     public double Width { get; set; } = 420;
     public double Height { get; set; } = 320;
     public bool IsCollapsed { get; set; }
+    // Null means an older layout whose touching groups still need a one-time migration.
+    public string? GroupId { get; set; }
+    public int GroupOrder { get; set; }
+    public bool GroupHorizontal { get; set; }
+    public bool AccordionMode { get; set; }
     public string ColorKey { get; set; } = "porcelain";
     public string TransparencyKey { get; set; } = "solid";
     public int TransparencyCustomPercent { get; set; } = 50;
@@ -71,6 +78,7 @@ public class ItemState
     public int? OriginalX { get; set; }
     public int? OriginalY { get; set; }
     public bool IsLarge { get; set; }
+    public bool IsFolder { get; set; }
     public ItemKind Kind { get; set; } = ItemKind.File;
     // Labels use this; files ignore it and fall back to Path-derived name.
     public string? LabelText { get; set; }
@@ -267,6 +275,10 @@ public static class LayoutStore
         X = src.X, Y = src.Y,
         Width = src.Width, Height = src.Height,
         IsCollapsed = src.IsCollapsed,
+        GroupId = src.GroupId,
+        GroupOrder = src.GroupOrder,
+        GroupHorizontal = src.GroupHorizontal,
+        AccordionMode = src.AccordionMode,
         ColorKey = src.ColorKey,
         TransparencyKey = src.TransparencyKey,
         TransparencyCustomPercent = src.TransparencyCustomPercent,
@@ -278,6 +290,7 @@ public static class LayoutStore
             OriginalX = i.OriginalX,
             OriginalY = i.OriginalY,
             IsLarge = i.IsLarge,
+            IsFolder = i.IsFolder,
             Kind = i.Kind,
             LabelText = i.LabelText,
         }).ToList(),

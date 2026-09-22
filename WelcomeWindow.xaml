@@ -99,7 +99,7 @@
             <StackPanel Margin="28,3,0,0">
                 <TextBlock Foreground="#FFD1D6DD" Text="Drag desktop icons into a picket to organize them." TextWrapping="Wrap"/>
                 <TextBlock Margin="0,4,0,0" Foreground="#FFD1D6DD" Text="Click a title to roll it up; drag the title to move the group." TextWrapping="Wrap"/>
-                <TextBlock Margin="0,4,0,0" Foreground="#FFD1D6DD" Text="Press Ctrl+Alt+D to show or hide every picket." TextWrapping="Wrap"/>
+                <TextBlock Margin="0,4,0,0" Foreground="#FFD1D6DD" Text="Ctrl+Alt+D focuses Pickets by default; press again while focused to hide. Change the shortcut or open keyboard help from the tray." TextWrapping="Wrap"/>
             </StackPanel>
         </StackPanel>
         </ScrollViewer>

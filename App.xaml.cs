@@ -80,6 +80,8 @@ public partial class App : Application
         Logger.Log("=== App startup ===");
 
         InstallCrashHandlers();
+        ApplyMenuPalette();
+        SystemParameters.StaticPropertyChanged += MenuAccessibilityChanged;
 
         if (recoveryRequested)
         {
@@ -122,11 +124,8 @@ public partial class App : Application
 
         InstallDisplayChangeWatcher();
 
-        // Ctrl+Alt+D hides/shows every picket -- the "I need a clean desktop right now" panic button.
-        _quickHide = new GlobalHotKey(
-            WindowInterop.MOD_CONTROL | WindowInterop.MOD_ALT,
-            WindowInterop.VK_D,
-            ToggleAllPicketsVisibility);
+        // Configurable global shortcut: summon keyboard focus, or hide when already focused.
+        RegisterFocusShortcut();
 
         // Desktop double-click gesture: double-click on the bare desktop toggles picket visibility.
         _desktopHook = new DesktopDoubleClickHook(ToggleAllPicketsVisibility);
@@ -149,6 +148,9 @@ public partial class App : Application
         // without this there's no way to prove the app is running or to quit it.
         _tray = new TrayIcon(
             onToggleVisibility: ToggleAllPicketsVisibility,
+            onFocus: FocusPickets,
+            onShortcutSettings: () => ConfigureFocusShortcut(null),
+            onKeyboardHelp: PicketWindow.ShowKeyboardHelp,
             onNewPicket:         () => CreatePicket(300, 200),
             onShowWelcome:       ShowWelcome,
             onReleaseAndQuit:    ReleaseAllCapturedIconsAndQuit,
@@ -232,6 +234,7 @@ public partial class App : Application
 
         foreach (var state in states)
             SpawnPicket(state);
+        foreach (var group in _pickets.GroupBy(p => p.GroupId)) group.First().NormalizeConnectedGroup();
 
         if (_pickets.Count == 0)
             CreatePicket(200, 200);
@@ -243,7 +246,7 @@ public partial class App : Application
     {
         var paths = _pickets
             .SelectMany(f => f.Items)
-            .Where(i => i.Kind == ItemKind.File && i.OriginalDesktopPos.HasValue && !i.IsMissing)
+            .Where(i => i.Kind == ItemKind.File && i.OriginalDesktopPos.HasValue)
             .Select(i => i.Path)
             .ToList();
         if (paths.Count == 0) return;
@@ -293,7 +296,9 @@ public partial class App : Application
         // Older layouts allowed small seams and fractional size differences inside a connected
         // group. Repair them only after every member exists, so cluster discovery sees the whole
         // saved stack rather than normalizing one window at a time while it is being spawned.
-        foreach (var picket in _pickets.ToList())
+        foreach (var picket in _pickets.Where(p => p.NeedsGroupMigration).ToList())
+            if (picket.NeedsGroupMigration) picket.JoinTouchingGroups(migrateOnly: true);
+        foreach (var picket in _pickets.GroupBy(p => p.GroupId).Select(g => g.First()))
             picket.NormalizeConnectedGroup();
     }
 
@@ -347,6 +352,7 @@ public partial class App : Application
                 f.Left = state.X; f.Top = state.Y;
                 f.Width = state.Width; f.Height = state.Height;
             }
+            foreach (var group in _pickets.GroupBy(p => p.GroupId)) group.First().NormalizeConnectedGroup();
             MarkDirty();
             return;
         }
@@ -410,6 +416,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        SystemParameters.StaticPropertyChanged -= MenuAccessibilityChanged;
         // A secondary instance set up none of the subsystems below and -- crucially -- must NOT
         // SaveLayout(), or it would persist its empty picket list over the real layout. Just release
         // its mutex handle and leave.
@@ -491,19 +498,18 @@ public partial class App : Application
             ColorKey = PicketColors.Get(_layout.DefaultColorKey).Key,
         };
         var picket = SpawnPicket(state);
+        picket.JoinTouchingGroups();
+        picket.FocusForKeyboard();
         MarkDirty();
         return picket;
     }
 
     public void DeletePicket(PicketWindow picket)
     {
-        foreach (var item in picket.Items)
-        {
-            if (item.OriginalDesktopPos.HasValue && !item.IsMissing)
-                DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value);
-        }
+        if (!picket.TryReleaseAllReferences()) return;
         _pickets.Remove(picket);
         picket.Close();
+        _pickets.FirstOrDefault(p => p.GroupId == picket.GroupId)?.NormalizeConnectedGroup();
         MarkDirty();
     }
 
@@ -512,8 +518,8 @@ public partial class App : Application
         ApplyGlobalAppearance(state);
         var picket = new PicketWindow(state);
         picket.LayoutChanged += (_, _) => MarkDirty();
-        picket.Show();
         _pickets.Add(picket);
+        picket.Show();
         // Spawning a new picket may already overlap an existing one -- refresh everyone's link state.
         foreach (var f in _pickets) f.RefreshLinkState();
         return picket;
@@ -573,7 +579,7 @@ public partial class App : Application
         _rehideTimer?.Stop();
 
         var captured = _pickets.SelectMany(picket => picket.Items)
-            .Where(item => item.OriginalDesktopPos.HasValue && !item.IsMissing)
+            .Where(item => item.OriginalDesktopPos.HasValue)
             .GroupBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
             .Select(group => new CapturedDesktopIcon(
                 group.Key, group.First().OriginalDesktopPos!.Value))

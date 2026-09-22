@@ -4,10 +4,10 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Windows 10/11](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4.svg)](#requirements)
 
-A lightweight, offline desktop-icon organizer for Windows. Pickets collects shortcuts and files
-inside movable, translucent groups that stay at the wallpaper layer of your desktop.
+A lightweight desktop organizer for Windows. Pickets keeps references to your files and folders
+inside movable, translucent groups at the wallpaper layer. Your files stay in their original locations.
 
-- No accounts, network access, ads, or telemetry.
+- No accounts, ads, telemetry, or background web services.
 - Choose a guided per-user installer or a standalone portable build.
 - Your files stay where they are; Pickets manages their desktop presentation.
 
@@ -102,13 +102,16 @@ menu at any time.
 | Action | Control |
 | --- | --- |
 | Add desktop icons | Drag them into a picket |
+| Add references from anywhere | Title menu → **Add files / Add folders**, or **Ctrl+O / Ctrl+Shift+O** |
 | Capture several icons | Hold **Shift** and right-drag a rectangle on the desktop |
 | Open or roll up a picket | Single-click its title |
 | Move a picket or connected stack | Drag its title bar |
 | Resize a picket or connected group | Drag an outside edge or corner |
-| Return an icon to the desktop | Drag it out, or choose **Remove from picket** |
+| Return a captured icon to the desktop | Drag it out, or choose **Remove reference** |
+| Remove any reference | Select it and press **Delete**; the original file is never deleted |
 | Open an item | Double-click it |
-| Hide or show every picket | Press **Ctrl+Alt+D**, double-click the desktop, or use the tray icon |
+| Focus Pickets | **Ctrl+Alt+D** by default; press again while focused to hide |
+| Hide or show every picket | Double-click the desktop or use the tray icon |
 | Create, customize, or delete a picket | Right-click its title |
 | Quit safely | Choose **Quit Pickets**; desktop icons are restored until the next launch |
 | Release icons permanently | Choose **Release all icons and quit**, or run with `--restore-icons` |
@@ -120,7 +123,65 @@ coordinated color systems, transparency levels, optional background blur, sectio
 large icons.
 
 Connected groups form a row or a column. Joining pickets into an irregular arrangement, such as an
-L-shape or grid, settles the group into one consistently sized vertical stack.
+L-shape or grid, settles the group into one consistently sized vertical stack. Membership, order,
+shared dimensions, and collapsed state are saved across restarts and display profiles. Use **Unlink
+section** to detach one; merely moving the group does not break it apart.
+
+### Optional accordion stacks
+
+Right-click a title and enable **Accordion: one section open**. The group becomes a vertical stack:
+opening a section closes the other bodies and slides their titles into place. Click the open title
+to collapse everything. Turn the option off to allow several open sections again. Body content
+scrolls when the stack needs to fit a smaller work area. Expanded sections retain one shared size.
+
+### File references, not file operations
+
+**Add files / Add folders** stores references without moving, copying, hiding, or creating shortcuts.
+The same file can appear in several pickets. Dragging a desktop icon in retains the existing desktop
+capture behavior; adding it through the dialogs leaves its desktop icon visible.
+
+Right-click a reference for **Open file location**, **Check again**, **Locate file / Locate folder**,
+and **Move reference to** another picket. Locate updates the saved reference, not the original file.
+Unplugged drives, unavailable shares, and missing files stay saved with a visible status. Reconnect
+and choose **Check again**, or locate the replacement if it moved. Availability checks and thumbnails
+run off the UI thread with bounded concurrency and timeouts.
+
+Dragging between pickets transfers a reference. Dragging a captured icon out restores its desktop
+presentation. Other reference drags remain inside Pickets; they never ask Explorer to move or copy
+the source. **Remove reference** removes only the reference (and restores a captured desktop icon).
+
+### Keyboard and accessibility
+
+Use **Focus Pickets** in the tray or the configurable global shortcut (default **Ctrl+Alt+D**).
+Change it from the tray or title menu → **Settings → Change focus shortcut**; **None** disables it.
+If another app owns the key combination, Pickets reports the conflict and keeps your previous setting.
+
+| Key | Action |
+| --- | --- |
+| Ctrl+Tab / Ctrl+Shift+Tab | Next / previous picket |
+| Tab / Shift+Tab | Move between controls |
+| Enter / Space on a title | Expand / collapse |
+| Down on a title | Open and enter its references |
+| Arrow keys | Navigate references |
+| Space / Ctrl+Space; Shift+Arrow | Select / toggle; extend selection |
+| Enter on a reference | Open it |
+| Delete | Remove selected references, never the files |
+| Shift+F10 | Context menu, including **Move reference to** |
+| F2 | Rename this picket |
+| Escape | Collapse and focus the title |
+| Ctrl+O / Ctrl+Shift+O | Add files / folders |
+| Ctrl+N | New picket |
+| Ctrl+Shift+Up / Down | Reorder focused reference, or section when its title is focused |
+| Alt+Arrow | Move the connected group |
+| Ctrl+Alt+Arrow | Resize the connected group |
+| F1 | Keyboard help |
+
+Titles expose names and expanded/collapsed state through Windows UI Automation; references expose
+selection and availability information. Controls have visible focus indicators, use Windows
+high-contrast colors when enabled, and accommodate larger text with wrapping and scrolling.
+Animations respect the Windows animation preference. Automated UI Automation and rendering tests
+cover this baseline; a hands-on Narrator and mixed-DPI focus pass remains part of the
+[release checklist](docs/RELEASE_CHECKLIST.md).
 
 The system tray remains available when every picket is hidden. From there you can show or hide
 pickets, create a new one, enable launch at login, open About/diagnostics, or quit. Normal Quit
@@ -170,14 +231,16 @@ recovery request is forwarded to that instance.
 - Eight contrast-aware themes, transparency, and Windows background blur.
 - Section labels and optional large icons.
 - Magnetic screen-edge and picket-to-picket snapping.
-- Group movement, group resizing, and one-click unlinking.
+- Persistent connected groups, shared resizing, opt-in accordion stacks, and one-click unlinking.
+- Non-destructive file/folder references with availability checks and relinking.
+- Keyboard navigation, configurable focus shortcut, UI Automation, and high-contrast support.
 - Separate layouts for different monitor arrangements.
 - Explorer-restart recovery and a watchdog for icons Windows moves back on-screen.
 - Emergency icon restoration independent of normal UI startup.
 - About window with version information, the data folder, and sanitized diagnostic copying.
 - Single-instance behavior and an always-accessible system tray.
 - Guided per-user installer and a standalone portable download.
-- Fully offline operation with no telemetry or user account.
+- Works offline for local files, with no telemetry or user account.
 
 ## Requirements
 
@@ -232,7 +295,7 @@ portable executable, and checksums to a GitHub Release.
 under [Before first use](#before-first-use)
 are disabled. Explorer may briefly redraw an icon before Pickets hides it again.
 
-**All pickets disappeared:** Press **Ctrl+Alt+D**, double-click an empty area of the desktop, or
+**All pickets disappeared:** Use your focus shortcut (**Ctrl+Alt+D** by default), double-click an empty area of the desktop, or
 left-click the Pickets tray icon. Launching Pickets again also surfaces the already-running instance.
 
 **Launch at login stopped working after moving the executable:** Open a picket's title menu and
@@ -249,11 +312,17 @@ when the updated app starts.
 `Pickets.exe --restore-icons`. This permanently releases every captured icon so later launches do
 not hide it again.
 
+**A drive or file is unavailable:** The reference stays saved. Reconnect its location and choose
+**Check again**, or use **Locate file / Locate folder**. Pickets never automatically deletes missing
+references.
+
 ## Privacy and security
 
 Pickets uses low-level mouse hooks only to recognize the desktop lasso and double-click gestures.
-It does not record keystrokes, inspect document contents, connect to the internet, or transmit any
-data. The run-at-login option writes only the current executable path to the current user's standard
+It does not record keystrokes or run online services. Windows checks referenced paths and generates
+file thumbnails; references on network drives or shares can therefore contact those locations.
+Opening an item uses its associated Windows application. Pickets sends no telemetry.
+The run-at-login option writes only the current executable path to the current user's standard
 Windows `Run` registry key and does not require administrator access.
 Setup also records its installation folder and desktop-shortcut choice under the current user's
 `Software\Pickets\Setup` registry key so onboarding can respect those choices. Uninstall removes

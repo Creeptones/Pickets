@@ -35,10 +35,20 @@
 - [ ] Restart Windows Explorer while Pickets is running.
 - [ ] Force-terminate Pickets, relaunch it, and inspect the previous-session log.
 - [ ] Drag desktop icons in, between pickets, and back out.
-- [ ] Drag a non-desktop file into and back out of a picket.
+- [ ] Add a non-desktop file/folder by drag and by dialog; verify its original path and contents do not change.
+- [ ] Add one file to two pickets; remove either reference and verify the other and original remain.
 - [ ] Exercise lasso creation, roll-up stacks, group movement, resizing, and unlinking.
 - [ ] Join an L-shape/grid and verify it becomes one flush column that moves and resizes together.
-- [ ] Verify missing/renamed items and **Clean up missing items**.
+- [ ] Disconnect a removable/network drive; references remain, the UI responds, and **Check again**
+      recovers them after reconnection. Test **Locate file / Locate folder** for renamed items.
+- [ ] Enable accordion mode; switch sections, collapse all, disable it, and restart.
+- [ ] Resize from the bottom of a collapsed final section; all expanded bodies keep the shared size.
+- [ ] Save a stack, reconnect monitors, and confirm membership/order and flush seams persist.
+- [ ] Complete a mouse-free pass: focus shortcut, Ctrl+Tab, selection/open/remove, context menu transfer,
+      rename, new picket, add files/folders, reorder, group move/resize, and Escape.
+- [ ] Change the global focus shortcut, test a conflict, disable it, and restart to confirm persistence.
+- [ ] Use Narrator to read title expansion, item names/status, selection, and popup controls.
+- [ ] Verify Windows high contrast, larger text, visible focus, and reduced-motion preferences live.
 - [ ] Verify former folder portals still load as ordinary folder shortcuts.
 - [ ] Verify normal Quit restores icons and a later launch collects them again.
 - [ ] Verify **Exit and keep icons hidden** behaves as labeled.
@@ -46,6 +56,20 @@
 - [ ] Verify copied diagnostics redact the Windows username and user-profile path.
 
 ## Release
+
+### Interaction implementation verification (2026-09-21)
+
+Automated tests cover stack geometry at 100–200% scaling, accordion state transitions, saved
+membership/order and profile seeding, unavailable references, shortcut parsing, and the real WPF
+controls' UI Automation names, selection, and expansion. Isolated standard/high-contrast/large-text
+renders were inspected. These do not replace the live Windows interaction matrix above.
+The desktop automation helper was unavailable during this pass (native-pipe connection failure),
+so live global focus, Narrator, and mixed-DPI Explorer interaction are explicitly unverified.
+Local verification: 59 tests passed; Release builds had zero warnings; the single-file portable
+package and installer built successfully; all four installer recovery failures blocked removal
+and the success case allowed uninstall.
+
+### Publication
 
 - [ ] If signing is configured, verify the Authenticode signature and timestamp.
 - [ ] Create and push an annotated tag matching the project version, for example `v1.0.0`.

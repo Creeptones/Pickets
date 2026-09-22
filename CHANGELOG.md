@@ -7,6 +7,12 @@ All notable changes to Pickets are documented here. Versions follow
 
 ### Added
 
+- Persistent connected stacks with saved membership/order and optional one-section-open accordion mode.
+- Add-file and add-folder reference dialogs; open location, availability checks, relinking, and
+  keyboard-accessible transfers between pickets without moving or copying the original files.
+- Keyboard navigation and selection, stack move/resize/reorder commands, configurable focus shortcut,
+  UI Automation names/selection/expansion, focus indicators, and Windows high-contrast colors.
+
 - A transparent per-user installer now defaults to Local AppData, exposes destination, shortcut,
   and launch-at-login choices, requires no elevation, and restores captured icons on uninstall.
 - A lighter first-run guide now checks required desktop settings, explains why they matter, offers
@@ -18,6 +24,11 @@ All notable changes to Pickets are documented here. Versions follow
   creating shortcuts or enabling launch at login.
 
 ### Fixed
+
+- Unavailable and missing references remain saved instead of being removed by cleanup.
+- Reference probes and thumbnails run off the UI thread with bounded concurrency and timeouts.
+- Reference drags no longer advertise filesystem moves to Explorer; failed desktop-icon restoration
+  keeps the reference, and quitting checks captured icons even while availability is being refreshed.
 
 - Uninstall now requires successful icon recovery and a saved recovery state before removing files;
   failed recovery offers Retry/Cancel, and silent uninstall stops with an error.

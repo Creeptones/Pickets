@@ -9,23 +9,35 @@
         ResizeMode="NoResize"
         MinWidth="160" MinHeight="32"
         Title="Picket"
-        UseLayoutRounding="True">
+        UseLayoutRounding="True"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSizeKey}}">
     <Window.Resources>
-        <ContextMenu x:Key="ItemContextMenu">
+        <local:PicketCellWidthConverter x:Key="CellWidthConverter"/>
+        <local:PicketLabelWidthConverter x:Key="LabelWidthConverter"/>
+        <ContextMenu x:Key="ItemContextMenu" DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
             <MenuItem Header="Open" Click="ItemMenu_Open_Click"/>
+            <MenuItem Header="Check again" Click="ItemMenu_Check_Click"/>
+            <MenuItem Header="Locate file..." Click="ItemMenu_LocateFile_Click"/>
+            <MenuItem Header="Locate folder..." Click="ItemMenu_LocateFolder_Click"/>
             <MenuItem Header="Open file location" Click="ItemMenu_OpenLocation_Click"/>
+            <MenuItem Header="Move reference to" Tag="MoveReferenceTo"/>
             <MenuItem Header="Large icon (2x2)" Tag="LargeToggle" IsCheckable="True" Click="ItemMenu_ToggleLarge_Click"/>
             <Separator/>
             <MenuItem Header="Insert label above..." Click="ItemMenu_InsertLabelAbove_Click"/>
-            <MenuItem Header="Remove from picket (restore icon)" Click="ItemMenu_Remove_Click"/>
+            <MenuItem Header="Remove reference (never deletes the file)" Click="ItemMenu_Remove_Click"/>
         </ContextMenu>
-        <ContextMenu x:Key="LabelContextMenu">
+        <ContextMenu x:Key="LabelContextMenu" DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
             <MenuItem Header="Rename label..." Click="LabelMenu_Rename_Click"/>
             <MenuItem Header="Remove label" Click="LabelMenu_Remove_Click"/>
         </ContextMenu>
         <ContextMenu x:Key="TitleContextMenu">
             <MenuItem Header="Rename picket..." Click="TitleMenu_Rename_Click"/>
             <MenuItem Header="Roll up / down" Click="TitleMenu_ToggleCollapse_Click"/>
+            <MenuItem Header="Accordion: one section open" Tag="Accordion" IsCheckable="True" Click="TitleMenu_Accordion_Click"/>
+            <MenuItem Header="Move section earlier" Click="MoveSectionEarlier_Click"/>
+            <MenuItem Header="Move section later" Click="MoveSectionLater_Click"/>
+            <MenuItem Header="Unlink section" Click="UnlinkBtn_Click"/>
             <MenuItem Header="Appearance">
                 <MenuItem Header="Color" Tag="ColorMenu">
                 <MenuItem Header="Porcelain" Tag="porcelain" IsCheckable="True" Click="TitleMenu_SetColor_Click">
@@ -67,7 +79,7 @@
                         <StackPanel Orientation="Vertical" Width="200" Margin="0,2">
                             <TextBlock Tag="CustomLabel" Text="Custom: 50%" Margin="0,0,0,2"/>
                             <Slider Tag="CustomSlider"
-                                    Minimum="0" Maximum="100" Value="50"
+                                    Minimum="0" Maximum="100" Value="50" AutomationProperties.Name="Picket opacity"
                                     Width="190" TickFrequency="5"
                                     ValueChanged="TransparencyCustomSlider_ValueChanged"/>
                         </StackPanel>
@@ -77,13 +89,17 @@
                 <MenuItem Header="Blur background" Tag="BlurToggle" IsCheckable="True" Click="TitleMenu_ToggleBlur_Click"/>
             </MenuItem>
             <Separator/>
+            <MenuItem Header="Add files..." InputGestureText="Ctrl+O" Click="AddFiles_Click"/>
+            <MenuItem Header="Add folders..." InputGestureText="Ctrl+Shift+O" Click="AddFolder_Click"/>
             <MenuItem Header="Add section label..." Click="TitleMenu_AddLabel_Click"/>
             <MenuItem Header="New picket here" Click="TitleMenu_NewPicket_Click"/>
             <MenuItem Header="Delete this picket" Click="TitleMenu_DeletePicket_Click"/>
             <MenuItem Header="Settings">
-                <MenuItem Header="Clean up missing items" Click="TitleMenu_CleanMissing_Click"/>
+                <MenuItem Header="Check reference availability" Click="TitleMenu_CleanMissing_Click"/>
                 <Separator/>
-                <MenuItem Header="Hide / show all pickets (Ctrl+Alt+D)" Click="TitleMenu_HideAll_Click"/>
+                <MenuItem Header="Hide / show all pickets" Click="TitleMenu_HideAll_Click"/>
+                <MenuItem Header="Keyboard help..." InputGestureText="F1" Click="KeyboardHelp_Click"/>
+                <MenuItem Header="Change focus shortcut..." Click="ShortcutSettings_Click"/>
                 <MenuItem Header="Launch at login" Tag="LaunchAtLogin" IsCheckable="True" Click="TitleMenu_ToggleLaunchAtLogin_Click"/>
                 <Separator/>
                 <MenuItem Header="About Pickets..." Click="TitleMenu_About_Click"/>
@@ -98,9 +114,9 @@
         <!-- Tooltips need a solid background; default semi-transparent styling over a blurred picket
              becomes unreadable against wallpaper. Dark pill + light text works on any color scheme. -->
         <Style TargetType="ToolTip">
-            <Setter Property="Background" Value="#F01E1E1E"/>
-            <Setter Property="Foreground" Value="#FFFFFFFF"/>
-            <Setter Property="BorderBrush" Value="#FF000000"/>
+            <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.InfoBrushKey}}"/>
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,4"/>
             <Setter Property="FontSize" Value="12"/>
@@ -115,6 +131,24 @@
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter TextBlock.Foreground="{TemplateBinding Foreground}"/>
                         </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="HeaderButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource PicketTitleForeground}"/>
+            <Setter Property="Padding" Value="4,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Ring" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="2" CornerRadius="3" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Ring" Property="Background" Value="{DynamicResource PicketControlHoverBrush}"/></Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource PicketFocusBorder}"/></Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -140,96 +174,25 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="TitleText"
-                                   Grid.Column="0"
-                                   Text="Picket"
-                                   Foreground="#2C2C2C"
-                                   VerticalAlignment="Center"
-                                   Margin="12,0,4,0"
-                                   FontWeight="SemiBold"
-                                   FontSize="14"
-                                   TextTrimming="CharacterEllipsis">
-                            <TextBlock.Effect>
-                                <DropShadowEffect ShadowDepth="0" BlurRadius="3" Opacity="1"
-                                                  Color="{DynamicResource PicketTitleShadowColor}"/>
-                            </TextBlock.Effect>
-                        </TextBlock>
-                        <TextBox x:Name="TitleEditBox"
-                                 Grid.Column="0"
-                                 Visibility="Collapsed"
-                                 VerticalAlignment="Center"
-                                 Margin="10,1,4,1"
-                                 Background="{DynamicResource PicketEditorBackground}"
-                                 Foreground="#2C2C2C"
-                                 BorderBrush="{DynamicResource PicketEditorBorder}"
-                                 FontSize="14"
-                                 KeyDown="TitleEditBox_KeyDown"
-                                 LostFocus="TitleEditBox_LostFocus"/>
-                        <StackPanel Grid.Column="1"
-                                    Orientation="Horizontal"
-                                    VerticalAlignment="Center"
-                                    Margin="0,0,4,0">
-                            <Border x:Name="UnlinkBtn"
-                                    Width="22" Height="22"
-                                    Margin="0,0,2,0"
-                                    VerticalAlignment="Center"
-                                    CornerRadius="4"
-                                    Background="Transparent"
-                                    Cursor="Hand"
-                                    ToolTip="Unlink from neighbors"
-                                    Visibility="Collapsed"
-                                    MouseLeftButtonDown="UnlinkBtn_MouseLeftButtonDown">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="{DynamicResource PicketControlHoverBrush}"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                                <TextBlock Text="&#xE71B;"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           Foreground="{DynamicResource PicketTitleForeground}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontSize="12">
-                                    <TextBlock.Effect>
-                                        <DropShadowEffect ShadowDepth="0" BlurRadius="3" Opacity="1"
-                                                          Color="{DynamicResource PicketTitleShadowColor}"/>
-                                    </TextBlock.Effect>
-                                </TextBlock>
-                            </Border>
-                            <Border x:Name="AddPicketBtn"
-                                    Width="22" Height="22"
-                                    VerticalAlignment="Center"
-                                    CornerRadius="4"
-                                    Background="Transparent"
-                                    Cursor="Hand"
-                                    ToolTip="New picket"
-                                    MouseLeftButtonDown="AddPicketBtn_MouseLeftButtonDown">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="{DynamicResource PicketControlHoverBrush}"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                                <TextBlock Text="+"
-                                           Foreground="{DynamicResource PicketTitleForeground}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontSize="16"
-                                           FontWeight="Bold"
-                                           Margin="0,-2,0,0">
-                                    <TextBlock.Effect>
-                                        <DropShadowEffect ShadowDepth="0" BlurRadius="3" Opacity="1"
-                                                          Color="{DynamicResource PicketTitleShadowColor}"/>
-                                    </TextBlock.Effect>
-                                </TextBlock>
-                            </Border>
+                        <local:PicketHeaderButton x:Name="TitleToggle" Grid.Column="0" Style="{StaticResource HeaderButton}"
+                            ContextMenu="{StaticResource TitleContextMenu}" ContextMenuOpening="TitleBar_ContextMenuOpening"
+                            HorizontalContentAlignment="Left" Padding="8,0,2,0"
+                            PreviewMouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Click="TitleToggle_Click"
+                            AutomationProperties.HelpText="Expand or collapse this section. F2 renames. F1 opens keyboard help.">
+                            <TextBlock x:Name="TitleText" Text="Picket" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                        </local:PicketHeaderButton>
+                        <TextBox x:Name="TitleEditBox" Grid.Column="0" Visibility="Collapsed"
+                            VerticalAlignment="Center" Margin="10,1,4,1"
+                            AutomationProperties.Name="Picket name"
+                            Background="{DynamicResource PicketEditorBackground}"
+                            Foreground="{DynamicResource PicketTitleForeground}"
+                            BorderBrush="{DynamicResource PicketEditorBorder}"
+                            KeyDown="TitleEditBox_KeyDown" LostFocus="TitleEditBox_LostFocus"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
+                            <Button x:Name="UnlinkBtn" Width="24" Height="26" Style="{StaticResource HeaderButton}" Content="↗"
+                                AutomationProperties.Name="Unlink section" ToolTip="Unlink section" Visibility="Collapsed" Click="UnlinkBtn_Click"/>
+                            <Button x:Name="AddPicketBtn" Width="24" Height="26" Style="{StaticResource HeaderButton}" Content="+"
+                                AutomationProperties.Name="New picket" ToolTip="New picket (Ctrl+N)" Click="AddPicketBtn_Click"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -240,99 +203,79 @@
                               DragOver="ItemsHost_DragOver"
                               Background="Transparent"
                               MouseLeftButtonDown="BodyScroll_MouseLeftButtonDown">
-                    <ItemsControl x:Name="ItemsHost" Margin="6">
-                        <ItemsControl.Resources>
-                            <DataTemplate x:Key="FileItemTemplate">
-                                <Border Width="{Binding CellWidth}"
-                                        Height="{Binding CellHeight}"
-                                        Margin="2"
-                                        Padding="4"
-                                        CornerRadius="4"
-                                        BorderThickness="1"
-                                        Cursor="Hand"
-                                        Opacity="{Binding CellOpacity}"
-                                        MouseLeftButtonDown="Item_MouseDown"
-                                        MouseMove="Item_MouseMove"
-                                        MouseLeftButtonUp="Item_MouseLeftButtonUp"
-                                        ContextMenu="{StaticResource ItemContextMenu}"
-                                        ContextMenuOpening="Item_ContextMenuOpening"
-                                        ToolTip="{Binding Path}">
-                                    <Border.Style>
-                                        <!-- Base: fully transparent. Hover follows the theme's contrast color,
-                                             so it lightens dark schemes and darkens light schemes. Selection uses a translucent
-                                             accent fill + matching border so the wallpaper/picket color still
-                                             shows through the highlight. -->
-                                        <Style TargetType="Border">
-                                            <Setter Property="Background" Value="Transparent"/>
-                                            <Setter Property="BorderBrush" Value="Transparent"/>
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="{DynamicResource PicketItemHoverBrush}"/>
+                    <ListBox x:Name="ItemsHost" Margin="4" SelectionMode="Extended" BorderThickness="0" Background="Transparent"
+                        AutomationProperties.Name="Picket references" KeyboardNavigation.TabNavigation="Once"
+                        ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                                <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}"/>
+                                <Setter Property="AutomationProperties.HelpText" Value="{Binding Path}"/>
+                                <Setter Property="ContextMenu" Value="{StaticResource ItemContextMenu}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource PicketItemForeground}"/>
+                                <EventSetter Event="PreviewMouseLeftButtonDown" Handler="Item_MouseDown"/>
+                                <EventSetter Event="MouseMove" Handler="Item_MouseMove"/>
+                                <EventSetter Event="MouseLeftButtonUp" Handler="Item_MouseLeftButtonUp"/>
+                                <EventSetter Event="ContextMenuOpening" Handler="Item_ContextMenuOpening"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Cell" Margin="1" Padding="2" Background="Transparent" BorderBrush="Transparent" BorderThickness="2" CornerRadius="4">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Cell" Property="Background" Value="{DynamicResource PicketControlHoverBrush}"/></Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Cell" Property="Background" Value="{DynamicResource PicketSelectionBrush}"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource PicketSelectionForeground}"/>
                                                 </Trigger>
-                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                    <Setter Property="Background" Value="{DynamicResource PicketSelectionBackground}"/>
-                                                    <Setter Property="BorderBrush" Value="{DynamicResource PicketSelectionBorder}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <StackPanel VerticalAlignment="Center">
-                                        <Image Source="{Binding Icon}"
-                                               Width="{Binding IconSize}" Height="{Binding IconSize}"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,2,0,4"/>
-                                        <TextBlock Text="{Binding DisplayName}"
-                                                   Foreground="{DynamicResource PicketItemForeground}"
-                                                   TextWrapping="Wrap"
-                                                   TextAlignment="Center"
-                                                   FontSize="11"
-                                                   MaxHeight="32"
-                                                   TextTrimming="CharacterEllipsis">
-                                            <!-- Soft halo behind the label so it stays readable on any wallpaper,
-                                                 even when the picket body fades toward the desktop behind it. -->
-                                            <TextBlock.Effect>
-                                                <DropShadowEffect ShadowDepth="0" BlurRadius="3" Opacity="1"
-                                                                  Color="{DynamicResource PicketItemShadowColor}"/>
-                                            </TextBlock.Effect>
+                                                <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Cell" Property="BorderBrush" Value="{DynamicResource PicketFocusBorder}"/></Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Kind}" Value="Label">
+                                        <Setter Property="ContextMenu" Value="{StaticResource LabelContextMenu}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.Resources>
+                            <DataTemplate x:Key="FileItemTemplate">
+                                <StackPanel MinHeight="{Binding CellHeight}" ToolTip="{Binding Path}"
+                                    TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}">
+                                    <StackPanel.Width>
+                                        <MultiBinding Converter="{StaticResource CellWidthConverter}">
+                                            <Binding Path="CellWidth"/>
+                                            <Binding Path="FontSize" RelativeSource="{RelativeSource AncestorType=ListBoxItem}"/>
+                                        </MultiBinding>
+                                    </StackPanel.Width>
+                                    <Grid Width="{Binding IconSize}" Height="{Binding IconSize}" Margin="0,4,0,4">
+                                        <TextBlock Text="&#xE8A5;" FontFamily="Segoe MDL2 Assets" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers><DataTrigger Binding="{Binding Icon}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
                                         </TextBlock>
-                                    </StackPanel>
-                                </Border>
+                                        <Image Source="{Binding Icon}"/>
+                                    </Grid>
+                                    <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" TextAlignment="Center"/>
+                                    <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" TextAlignment="Center" Margin="1,4,1,0"/>
+                                </StackPanel>
                             </DataTemplate>
                             <DataTemplate x:Key="LabelItemTemplate">
-                                <!-- Width bound to the WrapPanel's ActualWidth so the label fills its row;
-                                     WrapPanel then auto-breaks lines before and after it. -->
-                                <Border Width="{Binding ActualWidth, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=WrapPanel}}"
-                                        Margin="0,8,0,4"
-                                        Padding="6,2"
-                                        Background="{DynamicResource PicketSectionBackground}"
-                                        CornerRadius="3"
-                                        Cursor="Hand"
-                                        ContextMenu="{StaticResource LabelContextMenu}">
-                                    <TextBlock Text="{Binding LabelText}"
-                                               Foreground="{DynamicResource PicketItemForeground}"
-                                               FontWeight="SemiBold"
-                                               FontSize="11"
-                                               TextTrimming="CharacterEllipsis">
-                                        <TextBlock.Effect>
-                                            <DropShadowEffect ShadowDepth="0" BlurRadius="3" Opacity="1"
-                                                              Color="{DynamicResource PicketItemShadowColor}"/>
-                                        </TextBlock.Effect>
-                                    </TextBlock>
-                                </Border>
+                                <TextBlock Text="{Binding LabelText}" FontWeight="SemiBold" Padding="6,8" TextWrapping="Wrap"
+                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                    Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=WrapPanel}, Converter={StaticResource LabelWidthConverter}}"/>
                             </DataTemplate>
-                            <local:PicketItemTemplateSelector x:Key="ItemSelector"
-                                                             FileTemplate="{StaticResource FileItemTemplate}"
-                                                             LabelTemplate="{StaticResource LabelItemTemplate}"/>
-                        </ItemsControl.Resources>
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplateSelector>
-                            <StaticResource ResourceKey="ItemSelector"/>
-                        </ItemsControl.ItemTemplateSelector>
-                    </ItemsControl>
+                            <local:PicketItemTemplateSelector x:Key="ItemSelector" FileTemplate="{StaticResource FileItemTemplate}" LabelTemplate="{StaticResource LabelItemTemplate}"/>
+                        </ListBox.Resources>
+                        <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>
+                        <ListBox.ItemTemplateSelector><StaticResource ResourceKey="ItemSelector"/></ListBox.ItemTemplateSelector>
+                    </ListBox>
                 </ScrollViewer>
             </DockPanel>
         </Border>
@@ -341,6 +284,7 @@
         <Thumb x:Name="ResizeRight"
                HorizontalAlignment="Right" VerticalAlignment="Stretch"
                Width="6" Cursor="SizeWE" Opacity="0"
+               Focusable="False"
                DragStarted="Resize_DragStarted" DragCompleted="Resize_DragCompleted"
                DragDelta="ResizeRight_DragDelta"/>
         <Thumb x:Name="ResizeBottom"

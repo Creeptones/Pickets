@@ -13,6 +13,20 @@ namespace Pickets;
 /// </summary>
 public static class ShellIconExtractor
 {
+    private static readonly System.Threading.SemaphoreSlim Workers = new(4);
+
+    internal static async System.Threading.Tasks.Task<BitmapSource?> GetIconAsync(string path)
+    {
+        if (!await Workers.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false)) return null;
+        var task = System.Threading.Tasks.Task.Run(() =>
+        {
+            try { return GetIcon(path); }
+            finally { Workers.Release(); }
+        });
+        try { return await task.WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false); }
+        catch (TimeoutException) { return null; }
+    }
+
     public static BitmapSource? GetIcon(string path, int preferredSize = 96)
     {
         try

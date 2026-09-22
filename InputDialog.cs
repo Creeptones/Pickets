@@ -27,6 +27,7 @@ public static class InputDialog
         buttons.Children.Add(cancel);
 
         var root = new StackPanel { Margin = new Thickness(12) };
+        System.Windows.Automation.AutomationProperties.SetName(textBox, prompt);
         root.Children.Add(new TextBlock { Text = prompt });
         root.Children.Add(textBox);
         root.Children.Add(buttons);

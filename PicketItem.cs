@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
 
 namespace Pickets;
@@ -15,9 +16,9 @@ public class PicketItem : INotifyPropertyChanged
 {
     public string Path { get; init; } = "";
     public string DisplayName { get; init; } = "";
-    public bool IsFolder { get; init; }
+    public bool IsFolder { get; private set; }
     public ItemKind Kind { get; init; } = ItemKind.File;
-    public BitmapSource? Icon { get; init; }
+    public BitmapSource? Icon { get; private set; }
 
     /// <summary>
     /// The icon's position on the real desktop before we hid it. Null if we never
@@ -41,16 +42,23 @@ public class PicketItem : INotifyPropertyChanged
         }
     }
 
-    private bool _isMissing;
+    private ReferenceStatus _status = ReferenceStatus.Checking;
+    public ReferenceStatus Status => _status;
+    public string StatusText => _status switch
+    {
+        ReferenceStatus.Checking => "Checking availability…",
+        ReferenceStatus.Missing => "Not found — locate or check again",
+        ReferenceStatus.Unavailable => "Unavailable — reconnect or check again",
+        _ => "",
+    };
+    public string AccessibleName => Kind == ItemKind.Label ? LabelText
+        : string.IsNullOrEmpty(StatusText) ? DisplayName : $"{DisplayName}, {StatusText}";
     public bool IsMissing
     {
-        get => _isMissing;
+        get => _status != ReferenceStatus.Available;
         set
         {
-            if (_isMissing == value) return;
-            _isMissing = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(CellOpacity));
+            SetStatus(value ? ReferenceStatus.Unavailable : ReferenceStatus.Available);
         }
     }
 
@@ -78,23 +86,22 @@ public class PicketItem : INotifyPropertyChanged
             if (_labelText == value) return;
             _labelText = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(AccessibleName));
         }
     }
 
     public double CellWidth  => IsLarge ? 168 : 84;
-    public double CellHeight => IsLarge ? 168 : 84;
+    public double CellHeight => (IsLarge ? 168 : 100) + (string.IsNullOrEmpty(StatusText) ? 0 : 32);
     public double IconSize   => IsLarge ? 96 : 40;
-    public double CellOpacity => IsMissing ? 0.4 : 1.0;
 
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-    public static PicketItem FromPath(string path)
+    public static PicketItem FromPath(string path, bool isFolder = false)
     {
         var name = System.IO.Path.GetFileName(path);
         if (string.IsNullOrEmpty(name)) name = path;
-        var isFolder = Directory.Exists(path);
         var ext = System.IO.Path.GetExtension(path);
         var display = (!isFolder && ext.Equals(".lnk", System.StringComparison.OrdinalIgnoreCase))
             ? System.IO.Path.GetFileNameWithoutExtension(path)
@@ -106,8 +113,38 @@ public class PicketItem : INotifyPropertyChanged
             DisplayName = display,
             IsFolder = isFolder,
             Kind = ItemKind.File,
-            Icon = ShellIconExtractor.GetIcon(path)
+            Icon = null,
         };
+    }
+
+    private void SetStatus(ReferenceStatus status)
+    {
+        _status = status;
+        OnPropertyChanged(nameof(Status));
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(IsMissing));
+        OnPropertyChanged(nameof(AccessibleName));
+        OnPropertyChanged(nameof(CellHeight));
+    }
+
+    private Task? _refreshTask;
+    internal Task RefreshAsync() => _refreshTask is { IsCompleted: false } ? _refreshTask : _refreshTask = RefreshCoreAsync();
+
+    private async Task RefreshCoreAsync()
+    {
+        SetStatus(ReferenceStatus.Checking);
+        var result = await FileReferenceProbe.CheckAsync(Path);
+        if (result.Status == ReferenceStatus.Available)
+        {
+            IsFolder = result.IsFolder;
+            OnPropertyChanged(nameof(IsFolder));
+        }
+        SetStatus(result.Status);
+        if (result.Status == ReferenceStatus.Available && Icon == null)
+        {
+            Icon = await ShellIconExtractor.GetIconAsync(Path);
+            OnPropertyChanged(nameof(Icon));
+        }
     }
 
     public static PicketItem CreateLabel(string text)

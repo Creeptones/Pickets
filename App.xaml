@@ -14,6 +14,7 @@
 
         <!-- Shared palette. Defined as resources so a future dark/light toggle only needs to
              flip a handful of values rather than chase hex literals. -->
+        <SolidColorBrush x:Key="MenuHighlightedForegroundBrush" Color="White"/>
         <Color x:Key="MenuBackgroundColor">#F01E1E1E</Color>
         <Color x:Key="MenuBorderColor">#FF000000</Color>
         <Color x:Key="MenuForegroundColor">#FFFFFFFF</Color>
@@ -32,10 +33,10 @@
              border; HasDropShadow adds a subtle elevation so the menu reads as floating rather
              than painted onto the picket. -->
         <Style TargetType="ContextMenu">
-            <Setter Property="Background"      Value="{StaticResource MenuBackgroundBrush}"/>
-            <Setter Property="BorderBrush"     Value="{StaticResource MenuBorderBrush}"/>
+            <Setter Property="Background"      Value="{DynamicResource MenuBackgroundBrush}"/>
+            <Setter Property="BorderBrush"     Value="{DynamicResource MenuBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Foreground"      Value="{StaticResource MenuForegroundBrush}"/>
+            <Setter Property="Foreground"      Value="{DynamicResource MenuForegroundBrush}"/>
             <Setter Property="Padding"         Value="4"/>
             <Setter Property="HasDropShadow"   Value="True"/>
             <Setter Property="Template">
@@ -65,7 +66,7 @@
         <Style x:Key="MenuSeparatorStyle" TargetType="Separator">
             <Setter Property="Height"     Value="1"/>
             <Setter Property="Margin"     Value="6,4"/>
-            <Setter Property="Background" Value="{StaticResource MenuSeparatorBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource MenuSeparatorBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Separator">
@@ -104,7 +105,7 @@
                                Text="&#xE73E;"
                                FontFamily="Segoe MDL2 Assets"
                                FontSize="12"
-                               Foreground="{StaticResource MenuForegroundBrush}"
+                               Foreground="{TemplateBinding Foreground}"
                                VerticalAlignment="Center"
                                HorizontalAlignment="Center"
                                Visibility="Collapsed"/>
@@ -114,27 +115,28 @@
                                       RecognizesAccessKey="True"
                                       VerticalAlignment="Center"
                                       Margin="6,0,8,0"
-                                      TextBlock.Foreground="{StaticResource MenuForegroundBrush}"/>
+                                      TextBlock.Foreground="{TemplateBinding Foreground}"/>
 
                     <!-- InputGestureText slot. We don't use gesture strings currently, but keeping
                          the column means future Ctrl+X-style hints have a spot without reflowing. -->
                     <TextBlock Grid.Column="2"
                                Text="{TemplateBinding InputGestureText}"
-                               Foreground="{StaticResource MenuDisabledForegroundBrush}"
+                               Foreground="{DynamicResource MenuDisabledForegroundBrush}"
                                VerticalAlignment="Center"
                                Margin="12,0,0,0"/>
                 </Grid>
             </Border>
             <ControlTemplate.Triggers>
                 <Trigger Property="IsHighlighted" Value="True">
-                    <Setter TargetName="Bg" Property="Background" Value="{StaticResource MenuHoverBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource MenuHighlightedForegroundBrush}"/>
+                    <Setter TargetName="Bg" Property="Background" Value="{DynamicResource MenuHoverBrush}"/>
                 </Trigger>
                 <Trigger Property="IsChecked" Value="True">
                     <Setter TargetName="CheckGlyph" Property="Visibility" Value="Visible"/>
                     <Setter TargetName="IconHost"   Property="Visibility" Value="Collapsed"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Foreground" Value="{StaticResource MenuDisabledForegroundBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource MenuDisabledForegroundBrush}"/>
                 </Trigger>
             </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -160,13 +162,13 @@
                                       RecognizesAccessKey="True"
                                       VerticalAlignment="Center"
                                       Margin="6,0,8,0"
-                                      TextBlock.Foreground="{StaticResource MenuForegroundBrush}"/>
+                                      TextBlock.Foreground="{TemplateBinding Foreground}"/>
                     <!-- MDL2 chevron glyph; matches the iconography used elsewhere in the title bar. -->
                     <TextBlock Grid.Column="2"
                                Text="&#xE76C;"
                                FontFamily="Segoe MDL2 Assets"
                                FontSize="10"
-                               Foreground="{StaticResource MenuDisabledForegroundBrush}"
+                               Foreground="{DynamicResource MenuDisabledForegroundBrush}"
                                VerticalAlignment="Center"
                                Margin="8,0,0,0"/>
 
@@ -179,8 +181,8 @@
                            AllowsTransparency="True"
                            Focusable="False"
                            PopupAnimation="Fade">
-                        <Border Background="{StaticResource MenuBackgroundBrush}"
-                                BorderBrush="{StaticResource MenuBorderBrush}"
+                        <Border Background="{DynamicResource MenuBackgroundBrush}"
+                                BorderBrush="{DynamicResource MenuBorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="6"
                                 Padding="4"
@@ -195,10 +197,11 @@
             </Border>
             <ControlTemplate.Triggers>
                 <Trigger Property="IsHighlighted" Value="True">
-                    <Setter TargetName="Bg" Property="Background" Value="{StaticResource MenuHoverBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource MenuHighlightedForegroundBrush}"/>
+                    <Setter TargetName="Bg" Property="Background" Value="{DynamicResource MenuHoverBrush}"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Foreground" Value="{StaticResource MenuDisabledForegroundBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource MenuDisabledForegroundBrush}"/>
                 </Trigger>
             </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -206,7 +209,7 @@
         <!-- MenuItem style. Role-based template selection via DataTrigger so the same Style works
              for both leaf items and submenu headers without per-item tagging. -->
         <Style TargetType="MenuItem">
-            <Setter Property="Foreground"    Value="{StaticResource MenuForegroundBrush}"/>
+            <Setter Property="Foreground"    Value="{DynamicResource MenuForegroundBrush}"/>
             <Setter Property="Background"    Value="Transparent"/>
             <Setter Property="BorderBrush"   Value="Transparent"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>

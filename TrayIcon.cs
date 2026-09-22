@@ -19,6 +19,9 @@ public sealed class TrayIcon : IDisposable
 
     public TrayIcon(
         Action onToggleVisibility,
+        Action onFocus,
+        Action onShortcutSettings,
+        Action onKeyboardHelp,
         Action onNewPicket,
         Action onShowWelcome,
         Action onReleaseAndQuit,
@@ -31,6 +34,9 @@ public sealed class TrayIcon : IDisposable
         var menu = new ContextMenuStrip();
 
         menu.Items.Add(new ToolStripMenuItem("Show / hide pickets", null, (_, _) => onToggleVisibility()));
+        menu.Items.Add(new ToolStripMenuItem("Focus Pickets", null, (_, _) => onFocus()));
+        menu.Items.Add(new ToolStripMenuItem("Change focus shortcut...", null, (_, _) => onShortcutSettings()));
+        menu.Items.Add(new ToolStripMenuItem("Keyboard help...", null, (_, _) => onKeyboardHelp()));
         menu.Items.Add(new ToolStripMenuItem("New picket", null, (_, _) => onNewPicket()));
         menu.Items.Add(new ToolStripMenuItem("Quick start guide...", null, (_, _) => onShowWelcome()));
         menu.Items.Add(new ToolStripSeparator());

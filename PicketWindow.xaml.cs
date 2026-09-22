@@ -61,9 +61,16 @@ public partial class PicketWindow : Window
     {
         InitializeComponent();
         PicketId = state.Id;
+        GroupId = state.GroupId ?? state.Id;
+        GroupOrder = state.GroupOrder;
+        _groupHorizontal = state.GroupHorizontal;
+        _accordionMode = state.AccordionMode;
+        NeedsGroupMigration = state.GroupId == null;
         TitleText.Text = state.Title;
         Left = state.X; Top = state.Y; Width = state.Width; Height = state.Height;
         ItemsHost.ItemsSource = Items;
+        TitleToggle.SetExpanded = SetExpanded;
+        UpdateAccessibleTitle();
         _expandedHeight = state.Height;
 
         _colorKey = PicketColors.Get(state.ColorKey).Key;
@@ -80,23 +87,27 @@ public partial class PicketWindow : Window
                 Items.Add(PicketItem.CreateLabel(i.LabelText ?? ""));
                 continue;
             }
-            var fi = PicketItem.FromPath(i.Path);
+            var fi = PicketItem.FromPath(i.Path, i.IsFolder);
             if (i.HasOriginalPos)
                 fi.OriginalDesktopPos = new POINT(i.OriginalX!.Value, i.OriginalY!.Value);
             fi.IsLarge = i.IsLarge;
-            fi.IsMissing = !PathExists(i.Path);
             Items.Add(fi);
+            _ = fi.RefreshAsync();
 
             // Re-apply offscreen position on launch (Explorer may have rearranged).
-            if (i.HasOriginalPos && !fi.IsMissing)
+            if (i.HasOriginalPos)
                 DesktopIconHider.ReapplyHidden(i.Path);
         }
 
         // One-time compatibility path: old folder portals did not persist their mirrored children.
         // Preserve the user's intent as a normal folder icon, then ToState drops PortalPath forever.
-        if (!string.IsNullOrEmpty(state.PortalPath) && Directory.Exists(state.PortalPath) &&
+        if (!string.IsNullOrEmpty(state.PortalPath) &&
             !Items.Any(i => string.Equals(i.Path, state.PortalPath, StringComparison.OrdinalIgnoreCase)))
-            Items.Add(PicketItem.FromPath(state.PortalPath));
+        {
+            var portal = PicketItem.FromPath(state.PortalPath, true);
+            Items.Add(portal);
+            _ = portal.RefreshAsync();
+        }
         _isLoading = false;
 
         if (state.IsCollapsed)
@@ -104,6 +115,13 @@ public partial class PicketWindow : Window
 
         Items.CollectionChanged += (_, _) => RaiseLayoutChanged();
         _suppressSliderEvent = false;
+        UpdateExpansionControls();
+        SystemParameters.StaticPropertyChanged += AccessibilitySettingsChanged;
+        Closed += (_, _) =>
+        {
+            _finishRollAnimation?.Invoke();
+            SystemParameters.StaticPropertyChanged -= AccessibilitySettingsChanged;
+        };
     }
 
     public PicketState ToState() => new()
@@ -112,8 +130,12 @@ public partial class PicketWindow : Window
         Title = TitleText.Text,
         X = Left, Y = Top,
         Width = Width,
-        Height = _isCollapsed ? _expandedHeight : Height,
+        Height = _expandedHeight,
         IsCollapsed = _isCollapsed,
+        GroupId = GroupId,
+        GroupOrder = GroupOrder,
+        GroupHorizontal = _groupHorizontal,
+        AccordionMode = _accordionMode,
         ColorKey = _colorKey,
         TransparencyKey = _transparencyKey,
         TransparencyCustomPercent = _transparencyCustomPercent,
@@ -131,6 +153,7 @@ public partial class PicketWindow : Window
                     OriginalX = i.OriginalDesktopPos?.X,
                     OriginalY = i.OriginalDesktopPos?.Y,
                     IsLarge = i.IsLarge,
+                    IsFolder = i.IsFolder,
                 }).ToList()
     };
 
@@ -295,11 +318,13 @@ public partial class PicketWindow : Window
     // === Title bar drag + double-click to roll up ===
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (_isRollAnimating) { e.Handled = true; return; }
         // The first click already toggles on release. Ignore the second half of a double-click so
         // the fence does not immediately toggle back to its starting state.
         if (e.ClickCount > 1) { e.Handled = true; return; }
         if (e.ClickCount == 1 && e.LeftButton == MouseButtonState.Pressed)
         {
+            TitleToggle.Focus();
             ClearSelection();
             var startLeft = Left;
             var startTop = Top;
@@ -308,7 +333,8 @@ public partial class PicketWindow : Window
             finally
             {
                 _dragCluster = null;
-                NormalizeConnectedGroup();
+                if (Math.Abs(Left - startLeft) >= 2 || Math.Abs(Top - startTop) >= 2) JoinTouchingGroups();
+                else NormalizeConnectedGroup();
             }
 
             // A title is both the drag handle and the accordion trigger. Treat a release without
@@ -327,92 +353,19 @@ public partial class PicketWindow : Window
         WindowInterop.GetWindowRect(new WindowInteropHelper(this).Handle, out _dragStartScreenRect);
     }
 
-    private List<PicketWindow> ComputeTouchingCluster()
-    {
-        var cluster = new List<PicketWindow> { this };
-        if (Application.Current is not App app) return cluster;
-        var pool = app.Pickets.ToList();
-
-        var queue = new Queue<PicketWindow>();
-        queue.Enqueue(this);
-        while (queue.Count > 0)
-        {
-            var f = queue.Dequeue();
-            foreach (var g in pool)
-            {
-                if (cluster.Contains(g)) continue;
-                if (AreGrouped(f, g))
-                {
-                    cluster.Add(g);
-                    queue.Enqueue(g);
-                }
-            }
-        }
-        return cluster;
-    }
 
     // Pickets within this many px of each other (or overlapping) count as one group and drag
     // together. Looser than requiring flush edges, so a stacked column or an overlapping pile still
     // moves as a unit. Kept below the unlink push (SHIFT) so "unlink" can still break a group apart.
     private const double GROUP_GAP = 20.0;
 
-    /// <summary>
-    /// Pulls a simple connected row or column into one flush, consistently sized component.
-    /// GROUP_GAP intentionally remains generous enough to recognize older saved layouts with small
-    /// seams; once recognized, those seams and fractional-DPI width/height drift are removed.
-    /// Irregular two-dimensional joins become a column so every connected member remains flush.
-    /// </summary>
-    public void NormalizeConnectedGroup()
-    {
-        var cluster = ComputeTouchingCluster();
-        if (cluster.Count <= 1) return;
-
-        var orientation = GetSimpleGroupOrientation(cluster);
-        var ordered = orientation == GroupOrientation.Column
-            ? cluster.OrderBy(p => p.Top).ThenBy(p => p.Left).ToList()
-            : cluster.OrderBy(p => p.Left).ThenBy(p => p.Top).ToList();
-        var reference = ordered[0];
-        var targetWidth = Math.Max(cluster.Max(p => p.MinWidth), reference.Width);
-        var targetExpandedHeight = Math.Max(cluster.Max(p => p.MinHeight),
-            reference._isCollapsed ? reference._expandedHeight : reference.Height);
-
-        foreach (var p in cluster)
-        {
-            p.Width = targetWidth;
-            p._expandedHeight = targetExpandedHeight;
-            if (!p._isCollapsed) p.Height = targetExpandedHeight;
-        }
-
-        ReflowCluster(ordered, orientation);
-        if (Application.Current is App app)
-            foreach (var p in app.Pickets) p.RefreshLinkState();
-    }
 
     private static GroupOrientation GetSimpleGroupOrientation(IReadOnlyCollection<PicketWindow> cluster)
         => ConnectedGroupLayout.Orientation(cluster.Select(p => new Rect(p.Left, p.Top, p.Width, p.Height)).ToList());
 
-    private static void ReflowCluster(List<PicketWindow> ordered,
-                                      GroupOrientation orientation)
+    private static void ReflowCluster(List<PicketWindow> ordered, GroupOrientation orientation)
     {
-        if (ordered.Count == 0) return;
-        var dpi = VisualTreeHelper.GetDpi(ordered[0]);
-        var bounds = ConnectedGroupLayout.Reflow(
-            ordered.Select(p => new Rect(p.Left, p.Top, p.Width, p.Height)).ToList(),
-            orientation, dpi.DpiScaleX, dpi.DpiScaleY);
-        for (var index = 0; index < ordered.Count; index++)
-        {
-            var p = ordered[index];
-            var target = bounds[index];
-            p.Left = target.Left;
-            p.Top = target.Top;
-            p.Width = target.Width;
-            p.Height = target.Height;
-            if (!p._isCollapsed)
-            {
-                p._expandedHeight = target.Height;
-            }
-            else p._expandedHeight = Math.Ceiling(p._expandedHeight * dpi.DpiScaleY) / dpi.DpiScaleY;
-        }
+        if (ordered.Count > 0) ApplyGroupBounds(ordered, ordered[0].Width, ordered[0]._expandedHeight);
     }
 
     /// <summary>True when two pickets belong to the same drag group: they form a column (overlap
@@ -443,7 +396,7 @@ public partial class PicketWindow : Window
             app.CreatePicket(Left + 30, Top + 30);
     }
 
-    private void AddPicketBtn_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void AddPicketBtn_Click(object sender, RoutedEventArgs e)
     {
         // Mark handled so the title bar's drag-move doesn't pick this click up.
         e.Handled = true;
@@ -451,25 +404,7 @@ public partial class PicketWindow : Window
             app.CreatePicket(Left + 30, Top + 30);
     }
 
-    private void UnlinkBtn_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        e.Handled = true;
-        var neighbors = ComputeTouchingCluster().Where(f => f != this).ToList();
-        if (neighbors.Count == 0) return;
-
-        // Push this picket in the direction away from the cluster's centroid -- that breaks contact
-        // regardless of whether neighbors are above, below, or surrounding us.
-        double cx = neighbors.Average(f => f.Left + f.Width  / 2);
-        double cy = neighbors.Average(f => f.Top  + f.Height / 2);
-        double dx = (Left + Width  / 2) - cx;
-        double dy = (Top  + Height / 2) - cy;
-        double mag = Math.Sqrt(dx * dx + dy * dy);
-        if (mag < 0.001) { dx = 1; dy = 1; mag = Math.Sqrt(2); }
-
-        const double SHIFT = 24;  // > SNAP_PIXELS so we don't immediately re-snap
-        Left += dx / mag * SHIFT;
-        Top  += dy / mag * SHIFT;
-    }
+    private void UnlinkBtn_Click(object sender, RoutedEventArgs e) => UnlinkGroup();
 
     /// <summary>Updates the unlink button's visibility based on whether this picket touches any neighbor.
     /// Called by App after any picket in the system moves.</summary>
@@ -495,8 +430,8 @@ public partial class PicketWindow : Window
         var onBottomEdge = Math.Abs(Top + Height - groupBottom) <= GROUP_GAP;
 
         ResizeRight.IsHitTestVisible = onRightEdge;
-        ResizeBottom.IsHitTestVisible = onBottomEdge && !_isCollapsed;
-        ResizeBottomRight.IsHitTestVisible = onRightEdge && onBottomEdge && !_isCollapsed;
+        ResizeBottom.IsHitTestVisible = onBottomEdge;
+        ResizeBottomRight.IsHitTestVisible = onRightEdge && onBottomEdge;
     }
 
     /// <summary>Makes a vertical run of separate native windows read as one continuous component.
@@ -505,7 +440,7 @@ public partial class PicketWindow : Window
     {
         if (Application.Current is not App app || OuterShell == null || TitleShell == null) return;
 
-        var aligned = app.Pickets.Where(other => other != this && HorizontallyOverlaps(other, this));
+        var aligned = app.Pickets.Where(other => other != this && other.GroupId == GroupId && HorizontallyOverlaps(other, this));
         var hasAbove = aligned.Any(other => other.Top < Top &&
             Math.Abs(other.Top + other.Height - Top) <= GROUP_GAP);
         var hasBelow = aligned.Any(other => other.Top > Top &&
@@ -524,13 +459,7 @@ public partial class PicketWindow : Window
 
     private bool HasTouchingNeighbor()
     {
-        if (Application.Current is not App app) return false;
-        foreach (var other in app.Pickets)
-        {
-            if (other == this) continue;
-            if (AreGrouped(this, other)) return true;
-        }
-        return false;
+        return ComputeTouchingCluster().Count > 1;
     }
 
     private void TitleMenu_DeletePicket_Click(object sender, RoutedEventArgs e)
@@ -549,8 +478,7 @@ public partial class PicketWindow : Window
 
     private void TitleMenu_CleanMissing_Click(object sender, RoutedEventArgs e)
     {
-        var missing = Items.Where(i => i.IsMissing).ToList();
-        foreach (var m in missing) Items.Remove(m);
+        CheckReferences_Click(sender, e);
     }
 
     private void TitleMenu_RestoreAll_Click(object sender, RoutedEventArgs e)
@@ -617,6 +545,8 @@ public partial class PicketWindow : Window
         RefreshSubmenuChecks(cm, "TransparencyMenu", _transparencyKey);
         RefreshBlurCheck(cm);
         RefreshLaunchAtLoginCheck(cm);
+        var accordion = FindMenuItemByTag(cm.Items, "Accordion");
+        if (accordion != null) accordion.IsChecked = _accordionMode;
 
         // Slider always reflects effective %, so dragging from any preset feels continuous.
         var (slider, label) = FindCustomSliderAndLabel(cm);
@@ -677,7 +607,8 @@ public partial class PicketWindow : Window
 
     private void ApplyVisuals()
     {
-        if (OuterShell == null) return; // can fire from XAML-parse-time slider events before fields are wired
+        if (OuterShell == null) return; // can fire during XAML initialization
+        if (SystemParameters.HighContrast) { ApplyHighContrastVisuals(); return; }
         var scheme = PicketColors.Get(_colorKey);
         var factor = CurrentTransparencyPercent / 100.0;
 
@@ -729,6 +660,9 @@ public partial class PicketWindow : Window
         Resources["PicketEditorBackground"] = editorBg;
         Resources["PicketEditorBorder"] = editorBorder;
         Resources["PicketSelectionBackground"] = selectionBg;
+        Resources["PicketSelectionBrush"] = selectionBg;
+        Resources["PicketSelectionForeground"] = itemFg;
+        Resources["PicketFocusBorder"] = titleFg;
         Resources["PicketSelectionBorder"] = selectionBorder;
         // Label halo is a Color (not a Brush) because DropShadowEffect.Color takes a Color DP.
         Resources["PicketTitleShadowColor"] = scheme.TitleShadow;
@@ -746,7 +680,7 @@ public partial class PicketWindow : Window
         // Tint alpha is scaled down further so the blur is visibly doing work rather than being
         // masked by a near-opaque tint.
         var tint = ScaleAlpha(scheme.Background, Math.Min(1.0, factor * 0.7));
-        WindowBlur.Apply(hwnd, _blurEnabled, tint);
+        WindowBlur.Apply(hwnd, _blurEnabled && !SystemParameters.HighContrast, tint);
     }
 
     private static Color ScaleAlpha(Color c, double factor)
@@ -778,6 +712,7 @@ public partial class PicketWindow : Window
         if (TitleEditBox.Visibility != Visibility.Visible) return;
         var newName = TitleEditBox.Text.Trim();
         if (!string.IsNullOrEmpty(newName)) TitleText.Text = newName;
+        UpdateAccessibleTitle();
         HideRenameBox();
         RaiseLayoutChanged();
     }
@@ -788,10 +723,8 @@ public partial class PicketWindow : Window
     {
         TitleEditBox.Visibility = Visibility.Collapsed;
         TitleText.Visibility = Visibility.Visible;
-        // Leaving keyboard focus on the now-hidden TextBox breaks OLE drop routing on this
-        // WorkerW-parented child window: subsequent Explorer drags fall through to the
-        // desktop behind the picket instead of hitting the ScrollViewer drop target.
-        Keyboard.ClearFocus();
+        // Keep focus on a visible control after editing, for both keyboard navigation and OLE drops.
+        TitleToggle.Focus();
     }
 
     private void TitleEditBox_KeyDown(object sender, KeyEventArgs e)
@@ -825,7 +758,6 @@ public partial class PicketWindow : Window
 
         if (collapsed)
         {
-            if (!_isCollapsed) _expandedHeight = Height;
             BodyScroll.Visibility = Visibility.Collapsed;
             Height = CollapsedHeight;
             _isCollapsed = true;
@@ -836,6 +768,7 @@ public partial class PicketWindow : Window
             Height = _expandedHeight;
             _isCollapsed = false;
         }
+        UpdateExpansionControls();
         RaiseLayoutChanged();
     }
 
@@ -844,100 +777,7 @@ public partial class PicketWindow : Window
     /// edge. Previously only this window changed height, so its body covered the rest of a stacked
     /// group. The whole transition is driven together so no overlap appears between animation frames.
     /// </summary>
-    private void AnimateCollapseState(bool collapsed)
-    {
-        var cluster = ComputeTouchingCluster()
-            .Where(p => HorizontallyOverlaps(p, this))
-            .OrderBy(p => p.Top)
-            .ToList();
-        var startHeight = Height;
-        if (collapsed) _expandedHeight = startHeight;
-
-        var targetHeight = collapsed ? CollapsedHeight : Math.Max(CollapsedHeight, _expandedHeight);
-
-        // The target is rebuilt from the top down rather than offset from today's positions. This
-        // repairs old overlaps, fractional DPI drift, and uneven gaps every time a tab is toggled.
-        var targetHeights = cluster.ToDictionary(p => p, p => p == this ? targetHeight : p.Height);
-        if (!collapsed && TryGetWorkAreaVertical(out var workTop, out var workBottom))
-        {
-            var excess = Math.Max(0, targetHeights.Values.Sum() - (workBottom - workTop));
-            if (excess > 0)
-            {
-                targetHeight = Math.Max(CollapsedHeight, targetHeight - excess);
-                targetHeights[this] = targetHeight;
-            }
-        }
-
-        var startTops = cluster.ToDictionary(p => p, p => p.Top);
-        var dpiScale = VisualTreeHelper.GetDpi(this).DpiScaleY;
-        double AlignToPixel(double value) => Math.Round(value * dpiScale) / dpiScale;
-        var targetTops = new Dictionary<PicketWindow, double>();
-        var cursor = AlignToPixel(cluster[0].Top);
-        foreach (var p in cluster)
-        {
-            targetTops[p] = cursor;
-            cursor = AlignToPixel(cursor + targetHeights[p]);
-        }
-
-        if (TryGetWorkAreaVertical(out var visibleTop, out var visibleBottom))
-        {
-            var finalMinTop = targetTops.Values.Min();
-            var finalMaxBottom = cluster.Max(p => targetTops[p] + targetHeights[p]);
-            var groupShift = finalMaxBottom > visibleBottom
-                ? visibleBottom - finalMaxBottom
-                : finalMinTop < visibleTop
-                    ? visibleTop - finalMinTop
-                    : 0;
-
-            if (groupShift != 0)
-                foreach (var p in cluster) targetTops[p] = AlignToPixel(targetTops[p] + groupShift);
-        }
-
-        foreach (var p in cluster) p._isRollAnimating = true;
-        if (!collapsed)
-        {
-            _isCollapsed = false;
-            BodyScroll.Visibility = Visibility.Visible;
-        }
-
-        var clock = Stopwatch.StartNew();
-        _rollAnimationTimer = new DispatcherTimer(DispatcherPriority.Render)
-        {
-            Interval = TimeSpan.FromMilliseconds(16),
-        };
-        _rollAnimationTimer.Tick += (_, _) =>
-        {
-            var progress = Math.Clamp(clock.Elapsed.TotalMilliseconds /
-                                      RollAnimationDuration.TotalMilliseconds, 0, 1);
-            // Cubic ease-in/out gives the expansion a soft start and a decisive, non-bouncy finish.
-            var eased = progress < 0.5
-                ? 4 * progress * progress * progress
-                : 1 - Math.Pow(-2 * progress + 2, 3) / 2;
-
-            Height = startHeight + (targetHeight - startHeight) * eased;
-            foreach (var p in cluster)
-                p.Top = startTops[p] + (targetTops[p] - startTops[p]) * eased;
-
-            if (progress < 1) return;
-
-            _rollAnimationTimer.Stop();
-            _rollAnimationTimer = null;
-            Height = targetHeight;
-            foreach (var p in cluster)
-            {
-                p.Top = targetTops[p];
-                p._isRollAnimating = false;
-            }
-
-            if (collapsed)
-            {
-                BodyScroll.Visibility = Visibility.Collapsed;
-                _isCollapsed = true;
-            }
-            RaiseLayoutChanged();
-        };
-        _rollAnimationTimer.Start();
-    }
+    private void AnimateCollapseState(bool collapsed) => AnimateStack(collapsed);
 
     private static bool HorizontallyOverlaps(PicketWindow a, PicketWindow b)
         => a.Left < b.Left + b.Width && b.Left < a.Left + a.Width;
@@ -968,6 +808,7 @@ public partial class PicketWindow : Window
 
     private void Resize_DragStarted(object sender, DragStartedEventArgs e)
     {
+        if (_isRollAnimating) return;
         NormalizeConnectedGroup();
         _resizeCluster = ComputeTouchingCluster();
         _resizeOrientation = GetSimpleGroupOrientation(_resizeCluster);
@@ -994,7 +835,7 @@ public partial class PicketWindow : Window
         if (_resizeCluster == null || _resizeCluster.Count == 0) return;
         var divisor = _resizeOrientation == GroupOrientation.Column
             ? Math.Max(1, _resizeCluster.Count(p => !p._isCollapsed)) : 1;
-        var target = Math.Max(Height + requestedChange / divisor, _resizeCluster.Max(p => p.MinHeight));
+        var target = Math.Max(_expandedHeight + requestedChange / divisor, 96);
         foreach (var p in _resizeCluster)
         {
             p._expandedHeight = target;
@@ -1006,23 +847,19 @@ public partial class PicketWindow : Window
     private List<PicketWindow> OrderResizeCluster()
         => _resizeCluster == null
             ? new List<PicketWindow>()
-            : _resizeOrientation == GroupOrientation.Row
-                ? _resizeCluster.OrderBy(p => p.Left).ToList()
-                : _resizeCluster.OrderBy(p => p.Top).ToList();
+            : _resizeCluster.OrderBy(p => p.GroupOrder).ToList();
 
     private void ResizeRight_DragDelta(object sender, DragDeltaEventArgs e)
         => ResizeClusterWidth(e.HorizontalChange);
 
     private void ResizeBottom_DragDelta(object sender, DragDeltaEventArgs e)
     {
-        if (_isCollapsed) return;
         ResizeClusterHeight(e.VerticalChange);
     }
 
     private void ResizeBottomRight_DragDelta(object sender, DragDeltaEventArgs e)
     {
         ResizeClusterWidth(e.HorizontalChange);
-        if (_isCollapsed) return;
         ResizeClusterHeight(e.VerticalChange);
     }
 
@@ -1085,16 +922,7 @@ public partial class PicketWindow : Window
                 : Array.Empty<string>();
         if (paths.Length == 0) { e.Handled = true; return; }
 
-        foreach (var p in paths)
-        {
-            if (Items.Any(it => string.Equals(it.Path, p, StringComparison.OrdinalIgnoreCase)))
-                continue;
-
-            var item = PicketItem.FromPath(p);
-            item.OriginalDesktopPos = DesktopIconHider.Hide(p);
-            item.IsMissing = !PathExists(p);
-            Items.Add(item);
-        }
+        AddReferences(paths, captureDesktop: true);
         e.Handled = true;
     }
 
@@ -1115,22 +943,9 @@ public partial class PicketWindow : Window
             return;
         }
 
-        // Single left click: select. Ctrl toggles (multi-select), plain click clears others first.
-        bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
-        if (ctrl)
-        {
-            item.IsSelected = !item.IsSelected;
-        }
-        else
-        {
-            ClearSelection(except: item);
-            item.IsSelected = true;
-        }
-
         _itemDragStart = e.GetPosition(this);
         _itemDragSource = fe;
         _itemDragItem = item;
-        e.Handled = true;
     }
 
     private void Item_MouseMove(object sender, MouseEventArgs e)
@@ -1147,15 +962,13 @@ public partial class PicketWindow : Window
         var item = _itemDragItem;
         ResetItemDragCandidate();
 
-        if (item.IsMissing || !PathExists(item.Path)) return;
+        if (item.Kind != ItemKind.File) return;
 
         var data = new DataObject();
         data.SetData(PicketItemDragFormat, new PicketItemDragPayload(this, item));
         // Captured desktop items already live in the Desktop folder. Advertising FileDrop makes
         // Explorer attempt a same-folder move and display "source and destination are the same".
-        // Keep those gestures private to Pickets; uncaptured items remain standard file drags.
-        if (!item.OriginalDesktopPos.HasValue)
-            data.SetData(DataFormats.FileDrop, new[] { item.Path });
+        // Keep all reference drags private: never ask Explorer to copy or move the original.
 
         var canceled = false;
         QueryContinueDragEventHandler cancelTracker = (_, args) =>
@@ -1176,15 +989,14 @@ public partial class PicketWindow : Window
 
         // A drop onto the desktop can report None because the filesystem item already lives there.
         // Cursor location, plus explicit Escape tracking, tells that valid gesture from cancellation.
-        if (canceled || !Items.Contains(item) ||
+        if (canceled || !item.OriginalDesktopPos.HasValue || !Items.Contains(item) ||
             !WindowInterop.GetCursorPos(out var cursor) || IsPointInsideAnyPicket(cursor)) return;
 
         if (item.OriginalDesktopPos.HasValue)
         {
             var dropPosition = new POINT(cursor.X - 32, cursor.Y - 32);
             if (!DesktopIconHider.Restore(item.Path, dropPosition) &&
-                !dropPosition.Equals(item.OriginalDesktopPos.Value))
-                DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value);
+                !DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value)) return;
         }
         Items.Remove(item);
         e.Handled = true;
@@ -1235,7 +1047,19 @@ public partial class PicketWindow : Window
             var largeItem = cm.Items.OfType<MenuItem>()
                 .FirstOrDefault(mi => "LargeToggle".Equals(mi.Tag));
             if (largeItem != null) largeItem.IsChecked = item.IsLarge;
-
+            var destinations = cm.Items.OfType<MenuItem>().FirstOrDefault(mi => "MoveReferenceTo".Equals(mi.Tag));
+            if (destinations != null && Application.Current is App app)
+            {
+                destinations.Items.Clear();
+                foreach (var target in app.Pickets.Where(p => p != this))
+                {
+                    var entry = new MenuItem { Header = target.ToState().Title,
+                        IsEnabled = !target.Items.Any(i => string.Equals(i.Path, item.Path, StringComparison.OrdinalIgnoreCase)) };
+                    entry.Click += (_, _) => MoveReferenceTo(item, target);
+                    destinations.Items.Add(entry);
+                }
+                destinations.IsEnabled = destinations.Items.Count > 0;
+            }
         }
     }
 
@@ -1274,34 +1098,12 @@ public partial class PicketWindow : Window
     {
         if (sender is MenuItem mi && mi.DataContext is PicketItem item)
         {
-            if (item.OriginalDesktopPos.HasValue && !item.IsMissing)
-                DesktopIconHider.Restore(item.Path, item.OriginalDesktopPos.Value);
-            Items.Remove(item);
+            RemoveReferences(new[] { item });
         }
     }
 
-    private static void LaunchItem(PicketItem item)
-    {
-        if (item.IsMissing)
-        {
-            MessageBox.Show($"This file no longer exists:\n{item.Path}",
-                "Pickets", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-        try
-        {
-            Process.Start(new ProcessStartInfo(item.Path) { UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Could not open:\n{item.Path}\n\n{ex.Message}",
-                "Pickets", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-    }
 
     // File.Exists returns false for directories, which would flag every dropped folder as missing.
-    private static bool PathExists(string p) => File.Exists(p) || Directory.Exists(p);
-
     // === Section labels ===
     private void TitleMenu_AddLabel_Click(object sender, RoutedEventArgs e)
     {
