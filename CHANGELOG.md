@@ -19,6 +19,13 @@ All notable changes to Pickets are documented here. Versions follow
 
 ### Fixed
 
+- Uninstall now requires successful icon recovery and a saved recovery state before removing files;
+  failed recovery offers Retry/Cancel, and silent uninstall stops with an error.
+- Onboarding preserves the installer's desktop-shortcut opt-out, reports unavailable desktop checks,
+  and requires confirmed readiness before hiding icons.
+- The first-run guide now resizes and scrolls to fit smaller screens and higher display scaling.
+- Irregular connected layouts settle into a flush column and resize as one group, including at
+  fractional display scaling.
 - Connected pickets now keep a single shared size, resize together from the group's outside
   boundary, and automatically close small gaps left by older layouts.
 

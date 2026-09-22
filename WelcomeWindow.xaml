@@ -4,7 +4,7 @@
         Title="Welcome to Pickets"
         Width="590" Height="610"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
         ShowInTaskbar="False"
         Background="#FF17191D"
         Foreground="#FFF4F5F7"
@@ -25,20 +25,21 @@
         </Style>
     </Window.Resources>
 
-    <Grid Margin="32">
+    <Grid Margin="24">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel>
-            <TextBlock Text="Welcome to Pickets" FontSize="28" FontWeight="SemiBold"/>
-            <TextBlock Margin="0,6,0,0" Foreground="#FFAFB7C2" FontSize="14"
+        <ScrollViewer x:Name="OnboardingContent" Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="0,0,12,0">
+        <StackPanel Margin="0,0,0,18">
+            <TextBlock Text="Welcome to Pickets" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <TextBlock Margin="0,6,0,0" Foreground="#FFAFB7C2" FontSize="14" TextWrapping="Wrap"
                        Text="Your desktop, organized without moving your files."/>
         </StackPanel>
 
-        <StackPanel Grid.Row="1" Margin="0,24,0,0">
             <StackPanel Orientation="Horizontal">
                 <TextBlock FontSize="16" FontWeight="SemiBold" Text="1   Ready your desktop"
                            VerticalAlignment="Center"/>
@@ -54,7 +55,7 @@
                    PlacementTarget="{Binding ElementName=DesktopHelpButton}"
                    Placement="Bottom" HorizontalOffset="6" VerticalOffset="4"
                    AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False">
-                <Border Width="410" Padding="15" CornerRadius="7"
+                <Border Width="410" MaxWidth="{Binding ActualWidth, ElementName=OnboardingContent}" Padding="15" CornerRadius="7"
                         Background="#FF24282E" BorderBrush="#FF53616D" BorderThickness="1">
                     <StackPanel>
                         <TextBlock Text="Why Pickets needs this" FontSize="14" FontWeight="SemiBold"
@@ -68,47 +69,45 @@
             </Popup>
             <TextBlock Margin="28,3,0,8" Foreground="#FFD1D6DD" TextWrapping="Wrap"
                        Text="Right-click the desktop, open View, and turn both options off. Pickets will check them for you."/>
-            <Grid Margin="28,0,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Margin="0,0,8,0" Padding="10,7" CornerRadius="5" Background="#FF24282E">
-                    <StackPanel Orientation="Horizontal">
+            <StackPanel Margin="28,0,0,0">
+                <Border Margin="0,0,0,6" Padding="10,7" CornerRadius="5" Background="#FF24282E">
+                    <DockPanel>
                         <Ellipse x:Name="AutoArrangeIndicator" Width="9" Height="9" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="AutoArrangeStatus" VerticalAlignment="Center"/>
-                    </StackPanel>
+                        <TextBlock x:Name="AutoArrangeStatus" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    </DockPanel>
                 </Border>
-                <Border Grid.Column="1" Margin="0,0,8,0" Padding="10,7" CornerRadius="5" Background="#FF24282E">
-                    <StackPanel Orientation="Horizontal">
+                <Border Margin="0,0,0,6" Padding="10,7" CornerRadius="5" Background="#FF24282E">
+                    <DockPanel>
                         <Ellipse x:Name="SnapToGridIndicator" Width="9" Height="9" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="SnapToGridStatus" VerticalAlignment="Center"/>
-                    </StackPanel>
+                        <TextBlock x:Name="SnapToGridStatus" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    </DockPanel>
                 </Border>
-                <Button Grid.Column="2" Content="Check again" Padding="12,6" Click="Recheck_Click"/>
-            </Grid>
+                <Button Content="Check again" HorizontalAlignment="Left" Padding="12,6" Click="Recheck_Click"/>
+                <TextBlock x:Name="ReadinessHint" Margin="0,8,0,0" Foreground="#FFD1D6DD" TextWrapping="Wrap"
+                           AutomationProperties.LiveSetting="Polite"/>
+            </StackPanel>
 
             <TextBlock Margin="0,20,0,0" FontSize="16" FontWeight="SemiBold" Text="2   Keep Pickets handy"/>
             <StackPanel Margin="28,3,0,0">
-                <CheckBox x:Name="CreateShortcutCheck" Content="Create a Pickets shortcut on my desktop"/>
-                <CheckBox x:Name="RunAtLoginCheck" Content="Start Pickets when I sign in"/>
+                <CheckBox x:Name="CreateShortcutCheck"><TextBlock Text="Create a Pickets shortcut on my desktop" TextWrapping="Wrap"/></CheckBox>
+                <CheckBox x:Name="RunAtLoginCheck"><TextBlock Text="Start Pickets when I sign in" TextWrapping="Wrap"/></CheckBox>
                 <TextBlock Margin="0,6,0,0" Foreground="#FF8F99A6" FontSize="12" TextWrapping="Wrap"
                            Text="Tip: keep Pickets.exe in a permanent folder before enabling these options."/>
             </StackPanel>
 
             <TextBlock Margin="0,20,0,0" FontSize="16" FontWeight="SemiBold" Text="3   Three useful moves"/>
             <StackPanel Margin="28,3,0,0">
-                <TextBlock Foreground="#FFD1D6DD" Text="Drag desktop icons into a picket to organize them."/>
-                <TextBlock Margin="0,4,0,0" Foreground="#FFD1D6DD" Text="Click a title to roll it up; drag the title to move the group."/>
-                <TextBlock Margin="0,4,0,0" Foreground="#FFD1D6DD" Text="Press Ctrl+Alt+D to show or hide every picket."/>
+                <TextBlock Foreground="#FFD1D6DD" Text="Drag desktop icons into a picket to organize them." TextWrapping="Wrap"/>
+                <TextBlock Margin="0,4,0,0" Foreground="#FFD1D6DD" Text="Click a title to roll it up; drag the title to move the group." TextWrapping="Wrap"/>
+                <TextBlock Margin="0,4,0,0" Foreground="#FFD1D6DD" Text="Press Ctrl+Alt+D to show or hide every picket." TextWrapping="Wrap"/>
             </StackPanel>
         </StackPanel>
+        </ScrollViewer>
 
-        <DockPanel Grid.Row="2" Margin="0,18,0,0">
-            <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" Foreground="#FF8F99A6"
+        <StackPanel Grid.Row="1" Margin="0,12,0,0">
+            <TextBlock Margin="0,0,0,8" Foreground="#FF8F99A6" TextWrapping="Wrap"
                        Text="Reopen this guide anytime from the tray menu."/>
-            <Button DockPanel.Dock="Right" Content="Start using Pickets" IsDefault="True" Click="GetStarted_Click"/>
-        </DockPanel>
+            <Button x:Name="GetStartedButton" HorizontalAlignment="Right" Content="Start using Pickets" IsDefault="True" Click="GetStarted_Click"/>
+        </StackPanel>
     </Grid>
 </Window>

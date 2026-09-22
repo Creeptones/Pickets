@@ -122,10 +122,23 @@ public static class LayoutStore
         return DefaultLayout();
     }
 
+    // Recovery must not mistake an unreadable layout for an empty desktop.
+    internal static LayoutFile? LoadForRecovery() => LoadForRecovery(LayoutPath, BackupPath);
+
+    internal static LayoutFile? LoadForRecovery(string primaryPath, string backupPath)
+    {
+        var primary = TryLoad(primaryPath, out var primaryError);
+        if (primary != null) return primary;
+        var backup = TryLoad(backupPath, out var backupError);
+        if (backup != null) return backup;
+        if (primaryError == null && backupError == null) return new LayoutFile();
+        Logger.Log($"Recovery cannot read layout: {primaryError}; backup: {backupError}");
+        return null;
+    }
+
     private static LayoutFile? TryLoad(string path, out string? error)
     {
         error = null;
-        if (!File.Exists(path)) return null;
 
         try
         {
@@ -136,6 +149,8 @@ public static class LayoutStore
                 Normalize(layout);
             return layout;
         }
+        catch (FileNotFoundException) { return null; }
+        catch (DirectoryNotFoundException) { return null; }
         catch (Exception ex)
         {
             error = ex.ToString();
@@ -268,7 +283,9 @@ public static class LayoutStore
         }).ToList(),
     };
 
-    public static void Save(LayoutFile layout)
+    public static void Save(LayoutFile layout) => TrySave(layout);
+
+    internal static bool TrySave(LayoutFile layout)
     {
         string? temporaryPath = null;
         try
@@ -294,10 +311,12 @@ public static class LayoutStore
                 File.Move(temporaryPath, path);
 
             temporaryPath = null;
+            return true;
         }
         catch (Exception ex)
         {
             Logger.Log($"LayoutStore.Save failed: {ex}");
+            return false;
         }
         finally
         {

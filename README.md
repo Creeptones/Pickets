@@ -63,8 +63,9 @@ folder.
 
 Open **Windows Settings → Apps → Installed apps**, find **Pickets**, and choose **Uninstall**.
 Before removing the application, the uninstaller asks Pickets to restore every captured desktop
-icon. It then removes the executable, its Start menu and desktop shortcuts, and the launch-at-login
-entry created by Setup.
+icon. If recovery cannot finish, uninstall stops with **Retry** and **Cancel** choices and leaves
+the app available for recovery. After success, it removes the executable, its Start menu and desktop
+shortcuts, and the launch-at-login entry created by Setup.
 
 Saved layouts and diagnostic logs remain in `%APPDATA%\Pickets`, making a later reinstall
 recoverable. After uninstalling, you may delete that folder manually if you also want to erase the
@@ -91,7 +92,9 @@ off both:
 - **Align icons to grid**
 
 The first-run guide shows the live status of both settings and includes a **Check again** button.
-If either setting changes later, Pickets warns at startup. You can reopen the guide from the tray
+It only proceeds once both settings are confirmed off; if Explorer cannot be checked, it says so.
+The guide respects your installer's desktop-shortcut choice and fits smaller displays with scrolling.
+If either setting changes later, Pickets reopens the guide at startup. You can reopen it from the tray
 menu at any time.
 
 ## Using Pickets
@@ -116,6 +119,9 @@ frame. Internal edges between connected pickets are not resize handles. The titl
 coordinated color systems, transparency levels, optional background blur, section labels, and
 large icons.
 
+Connected groups form a row or a column. Joining pickets into an irregular arrangement, such as an
+L-shape or grid, settles the group into one consistently sized vertical stack.
+
 The system tray remains available when every picket is hidden. From there you can show or hide
 pickets, create a new one, enable launch at login, open About/diagnostics, or quit. Normal Quit
 restores captured icons while Pickets is not running; the saved layout collects them again on the
@@ -134,7 +140,7 @@ across those display profiles.
 
 ### Local data and recovery
 
-All state stays under `%APPDATA%\Pickets`:
+Layouts and diagnostic logs stay under `%APPDATA%\Pickets`:
 
 | File | Purpose |
 | --- | --- |
@@ -249,6 +255,9 @@ Pickets uses low-level mouse hooks only to recognize the desktop lasso and doubl
 It does not record keystrokes, inspect document contents, connect to the internet, or transmit any
 data. The run-at-login option writes only the current executable path to the current user's standard
 Windows `Run` registry key and does not require administrator access.
+Setup also records its installation folder and desktop-shortcut choice under the current user's
+`Software\Pickets\Setup` registry key so onboarding can respect those choices. Uninstall removes
+these setup preferences.
 
 ## Contributing
 

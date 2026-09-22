@@ -33,3 +33,6 @@ jobs:
           [xml]$project = Get-Content Pickets.csproj
           $version = [string]$project.Project.PropertyGroup.Version
           ./installer/build-installer.ps1 -Version $version
+      - name: Verify uninstall recovery gate
+        shell: pwsh
+        run: ./installer/tests/Test-UninstallRecovery.ps1 -Compiler "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe"

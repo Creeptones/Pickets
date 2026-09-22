@@ -13,6 +13,8 @@
 - [ ] `dotnet build Pickets.csproj --configuration Release`
 - [ ] Publish with the `win-x64` profile and confirm the folder contains only `Pickets.exe`.
 - [ ] Build `PicketsSetup.exe`; verify its version metadata and both SHA-256 entries.
+- [ ] Run `installer/tests/Test-UninstallRecovery.ps1 -Compiler <path-to-ISCC.exe>`; verify all
+      recovery failure codes preserve the isolated fixture and success removes it.
 - [ ] Launch the published executable and verify the version in **About Pickets**.
 
 ## Windows interaction matrix
@@ -23,6 +25,9 @@
 - [ ] Uninstall with captured icons and confirm they are restored while `%APPDATA%\Pickets` remains.
 - [ ] Verify the first-run readiness checks, desktop-shortcut option, launch-at-login option, and
       tray-menu quick start guide.
+- [ ] Decline the installer shortcut, defer launch until later, and confirm onboarding keeps it off.
+- [ ] Verify an unavailable Explorer check says "unable to check" and prevents first-run completion.
+- [ ] Check the guide in a small window: content scrolls and the Start button remains accessible.
 - [ ] Windows 10 version 1809 or newer smoke test.
 - [ ] 100%, 125%, 150%, and 200% display scaling.
 - [ ] Mixed-DPI multi-monitor arrangement.
@@ -32,6 +37,7 @@
 - [ ] Drag desktop icons in, between pickets, and back out.
 - [ ] Drag a non-desktop file into and back out of a picket.
 - [ ] Exercise lasso creation, roll-up stacks, group movement, resizing, and unlinking.
+- [ ] Join an L-shape/grid and verify it becomes one flush column that moves and resizes together.
 - [ ] Verify missing/renamed items and **Clean up missing items**.
 - [ ] Verify former folder portals still load as ordinary folder shortcuts.
 - [ ] Verify normal Quit restores icons and a later launch collects them again.

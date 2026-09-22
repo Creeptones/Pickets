@@ -15,26 +15,33 @@ public sealed class SingleInstance : IDisposable
     private const string MutexName     = "Pickets.SingleInstance.v1";
     private const string ShowEventName = "Pickets.ShowRequest.v1";
     private const string RestoreEventName = "Pickets.RestoreRequest.v1";
+    private const string PrepareRecoveryEventName = "Pickets.PrepareRecovery.v1";
 
     private readonly Mutex _mutex;
     private EventWaitHandle? _showEvent;
     private EventWaitHandle? _restoreEvent;
     private RegisteredWaitHandle? _showRegistration;
     private RegisteredWaitHandle? _restoreRegistration;
+    private EventWaitHandle? _prepareRecoveryEvent;
+    private RegisteredWaitHandle? _prepareRecoveryRegistration;
+    private bool _ownsMutex;
 
     /// <summary>True if this process is the first/owning instance. False means another is running.</summary>
     public bool IsFirstInstance { get; }
 
-    public SingleInstance()
+    public SingleInstance() : this(MutexName) { }
+
+    internal SingleInstance(string mutexName)
     {
-        _mutex = new Mutex(initiallyOwned: true, MutexName, out bool createdNew);
+        _mutex = new Mutex(initiallyOwned: true, mutexName, out bool createdNew);
         IsFirstInstance = createdNew;
+        _ownsMutex = createdNew;
     }
 
     /// <summary>First instance only: start listening for "surface yourself" pings from later launches.
     /// The callback fires on a thread-pool thread, so the supplied action must marshal to the UI
     /// thread itself.</summary>
-    public void ListenForRequests(Action onShowRequested, Action onRestoreRequested)
+    public void ListenForRequests(Action onShowRequested, Action onRestoreRequested, Action onPrepareRecovery)
     {
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
         _restoreEvent = new EventWaitHandle(false, EventResetMode.AutoReset, RestoreEventName);
@@ -50,6 +57,9 @@ public sealed class SingleInstance : IDisposable
             state: null,
             millisecondsTimeOutInterval: Timeout.Infinite,
             executeOnlyOnce: false);
+        _prepareRecoveryEvent = new EventWaitHandle(false, EventResetMode.AutoReset, PrepareRecoveryEventName);
+        _prepareRecoveryRegistration = ThreadPool.RegisterWaitForSingleObject(
+            _prepareRecoveryEvent, (_, _) => onPrepareRecovery(), null, Timeout.Infinite, false);
     }
 
     /// <summary>Second instance: ping the original to surface itself. Best-effort -- if the event
@@ -60,28 +70,26 @@ public sealed class SingleInstance : IDisposable
     public static void SignalRestoreRequest()
         => Signal(RestoreEventName);
 
+    public static void SignalPrepareRecovery() => Signal(PrepareRecoveryEventName);
+
     /// <summary>Waits for the owning instance to release the mutex. Used only by the silent
     /// uninstall recovery path so setup cannot remove the executable while recovery is active.</summary>
     public bool WaitForOwnerExit(TimeSpan timeout)
     {
         if (IsFirstInstance) return true;
 
-        var acquired = false;
         try
         {
-            acquired = _mutex.WaitOne(timeout);
-            return acquired;
+            _ownsMutex = _mutex.WaitOne(timeout);
+            return _ownsMutex;
         }
         catch (AbandonedMutexException)
         {
             // The prior process ended without releasing normally; this thread now owns the mutex.
-            acquired = true;
+            _ownsMutex = true;
             return true;
         }
-        finally
-        {
-            if (acquired) _mutex.ReleaseMutex();
-        }
+        // Keep ownership until Dispose: no other launch may re-hide icons during recovery.
     }
 
     private static void Signal(string eventName)
@@ -101,9 +109,11 @@ public sealed class SingleInstance : IDisposable
     {
         _showRegistration?.Unregister(waitObject: null);
         _restoreRegistration?.Unregister(waitObject: null);
+        _prepareRecoveryRegistration?.Unregister(waitObject: null);
         _showEvent?.Dispose();
         _restoreEvent?.Dispose();
-        try { if (IsFirstInstance) _mutex.ReleaseMutex(); } catch { /* not owned / already released */ }
+        _prepareRecoveryEvent?.Dispose();
+        try { if (_ownsMutex) _mutex.ReleaseMutex(); } catch { /* not owned / already released */ }
         _mutex.Dispose();
     }
 }

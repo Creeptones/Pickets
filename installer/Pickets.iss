@@ -59,10 +59,18 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingD
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Registry]
+Root: HKCU; Subkey: "Software\Pickets\Setup"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletevalue uninsdeletekeyifempty
+Root: HKCU; Subkey: "Software\Pickets\Setup"; ValueType: dword; ValueName: "DesktopShortcut"; ValueData: "{code:DesktopShortcutPreference}"; Flags: uninsdeletevalue uninsdeletekeyifempty
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Pickets"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletevalue; Tasks: startup
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch Pickets"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
 
-[UninstallRun]
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--restore-icons-silent"; StatusMsg: "Restoring captured desktop icons..."; Flags: runhidden waituntilterminated skipifdoesntexist; RunOnceId: "RestoreCapturedIcons"
+[Code]
+function DesktopShortcutPreference(Param: String): String;
+begin
+  if WizardIsTaskSelected('desktopicon') then Result := '1'
+  else Result := '0';
+end;
+
+#include "UninstallRecovery.iss"

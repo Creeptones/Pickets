@@ -360,7 +360,7 @@ public partial class PicketWindow : Window
     /// Pulls a simple connected row or column into one flush, consistently sized component.
     /// GROUP_GAP intentionally remains generous enough to recognize older saved layouts with small
     /// seams; once recognized, those seams and fractional-DPI width/height drift are removed.
-    /// Complex two-dimensional arrangements are left alone rather than being flattened into a row.
+    /// Irregular two-dimensional joins become a column so every connected member remains flush.
     /// </summary>
     public void NormalizeConnectedGroup()
     {
@@ -368,14 +368,12 @@ public partial class PicketWindow : Window
         if (cluster.Count <= 1) return;
 
         var orientation = GetSimpleGroupOrientation(cluster);
-        if (orientation == GroupOrientation.None) return;
-
         var ordered = orientation == GroupOrientation.Column
-            ? cluster.OrderBy(p => p.Top).ToList()
-            : cluster.OrderBy(p => p.Left).ToList();
+            ? cluster.OrderBy(p => p.Top).ThenBy(p => p.Left).ToList()
+            : cluster.OrderBy(p => p.Left).ThenBy(p => p.Top).ToList();
         var reference = ordered[0];
-        var targetWidth = Math.Max(reference.MinWidth, reference.Width);
-        var targetExpandedHeight = Math.Max(reference.MinHeight,
+        var targetWidth = Math.Max(cluster.Max(p => p.MinWidth), reference.Width);
+        var targetExpandedHeight = Math.Max(cluster.Max(p => p.MinHeight),
             reference._isCollapsed ? reference._expandedHeight : reference.Height);
 
         foreach (var p in cluster)
@@ -390,57 +388,30 @@ public partial class PicketWindow : Window
             foreach (var p in app.Pickets) p.RefreshLinkState();
     }
 
-    private enum GroupOrientation { None, Column, Row }
-
     private static GroupOrientation GetSimpleGroupOrientation(IReadOnlyCollection<PicketWindow> cluster)
-    {
-        var commonHorizontalSpan = cluster.Max(p => p.Left) <
-                                   cluster.Min(p => p.Left + p.Width);
-        var commonVerticalSpan = cluster.Max(p => p.Top) <
-                                 cluster.Min(p => p.Top + p.Height);
-
-        if (commonHorizontalSpan && !commonVerticalSpan) return GroupOrientation.Column;
-        if (commonVerticalSpan && !commonHorizontalSpan) return GroupOrientation.Row;
-        if (!commonHorizontalSpan && !commonVerticalSpan) return GroupOrientation.None;
-
-        // Fully overlapping windows satisfy both tests. Preserve the axis on which their centers
-        // are spread farther; exact piles default to a column.
-        var xSpread = cluster.Max(p => p.Left + p.Width / 2) -
-                      cluster.Min(p => p.Left + p.Width / 2);
-        var ySpread = cluster.Max(p => p.Top + p.Height / 2) -
-                      cluster.Min(p => p.Top + p.Height / 2);
-        return ySpread >= xSpread ? GroupOrientation.Column : GroupOrientation.Row;
-    }
+        => ConnectedGroupLayout.Orientation(cluster.Select(p => new Rect(p.Left, p.Top, p.Width, p.Height)).ToList());
 
     private static void ReflowCluster(List<PicketWindow> ordered,
                                       GroupOrientation orientation)
     {
         if (ordered.Count == 0) return;
         var dpi = VisualTreeHelper.GetDpi(ordered[0]);
-        double AlignX(double value) => Math.Round(value * dpi.DpiScaleX) / dpi.DpiScaleX;
-        double AlignY(double value) => Math.Round(value * dpi.DpiScaleY) / dpi.DpiScaleY;
-
-        if (orientation == GroupOrientation.Column)
+        var bounds = ConnectedGroupLayout.Reflow(
+            ordered.Select(p => new Rect(p.Left, p.Top, p.Width, p.Height)).ToList(),
+            orientation, dpi.DpiScaleX, dpi.DpiScaleY);
+        for (var index = 0; index < ordered.Count; index++)
         {
-            var left = AlignX(ordered[0].Left);
-            var cursor = AlignY(ordered[0].Top);
-            foreach (var p in ordered)
+            var p = ordered[index];
+            var target = bounds[index];
+            p.Left = target.Left;
+            p.Top = target.Top;
+            p.Width = target.Width;
+            p.Height = target.Height;
+            if (!p._isCollapsed)
             {
-                p.Left = left;
-                p.Top = cursor;
-                cursor = AlignY(cursor + p.Height);
+                p._expandedHeight = target.Height;
             }
-        }
-        else if (orientation == GroupOrientation.Row)
-        {
-            var top = AlignY(ordered[0].Top);
-            var cursor = AlignX(ordered[0].Left);
-            foreach (var p in ordered)
-            {
-                p.Left = cursor;
-                p.Top = top;
-                cursor = AlignX(cursor + p.Width);
-            }
+            else p._expandedHeight = Math.Ceiling(p._expandedHeight * dpi.DpiScaleY) / dpi.DpiScaleY;
         }
     }
 
@@ -838,6 +809,7 @@ public partial class PicketWindow : Window
     private void ToggleCollapse()
     {
         if (_isRollAnimating) return;
+        NormalizeConnectedGroup();
         ApplyCollapseState(!_isCollapsed, animate: true);
     }
 
@@ -1004,7 +976,6 @@ public partial class PicketWindow : Window
     private void Resize_DragCompleted(object sender, DragCompletedEventArgs e)
     {
         _resizeCluster = null;
-        _resizeOrientation = GroupOrientation.None;
         if (Application.Current is App app)
             foreach (var p in app.Pickets) p.RefreshLinkState();
     }
@@ -1012,7 +983,8 @@ public partial class PicketWindow : Window
     private void ResizeClusterWidth(double requestedChange)
     {
         if (_resizeCluster == null || _resizeCluster.Count == 0) return;
-        var target = Math.Max(Width + requestedChange, _resizeCluster.Max(p => p.MinWidth));
+        var divisor = _resizeOrientation == GroupOrientation.Row ? _resizeCluster.Count : 1;
+        var target = Math.Max(Width + requestedChange / divisor, _resizeCluster.Max(p => p.MinWidth));
         foreach (var p in _resizeCluster) p.Width = target;
         ReflowCluster(OrderResizeCluster(), _resizeOrientation);
     }
@@ -1020,7 +992,9 @@ public partial class PicketWindow : Window
     private void ResizeClusterHeight(double requestedChange)
     {
         if (_resizeCluster == null || _resizeCluster.Count == 0) return;
-        var target = Math.Max(Height + requestedChange, _resizeCluster.Max(p => p.MinHeight));
+        var divisor = _resizeOrientation == GroupOrientation.Column
+            ? Math.Max(1, _resizeCluster.Count(p => !p._isCollapsed)) : 1;
+        var target = Math.Max(Height + requestedChange / divisor, _resizeCluster.Max(p => p.MinHeight));
         foreach (var p in _resizeCluster)
         {
             p._expandedHeight = target;

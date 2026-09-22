@@ -174,29 +174,29 @@ public static class DesktopIconHider
         return found;
     }
 
-    public static bool IsAutoArrangeOn()
+    public static bool? IsAutoArrangeOn()
     {
-        return WithDesktopView(fv =>
+        return WithDesktopView<bool?>(fv =>
         {
             var hr = fv.GetAutoArrange();
-            Logger.Log($"GetAutoArrange hr=0x{hr:X8} ({(hr == 0 ? "ON" : "OFF")})");
-            return hr == 0;
+            Logger.Log($"GetAutoArrange hr=0x{hr:X8} ({(hr == 0 ? "ON" : hr == 1 ? "OFF" : "UNKNOWN")})");
+            return hr == 0 ? true : hr == 1 ? false : null;
         });
     }
 
     /// <summary>Returns whether "Align icons to grid" is on. Logs the full flag bits.</summary>
-    public static bool IsSnapToGridOn()
+    public static bool? IsSnapToGridOn()
     {
-        return WithDesktopView(fv =>
+        return WithDesktopView<bool?>(fv =>
         {
             if (fv is not IFolderView2 fv2)
             {
                 Logger.Log("  IFolderView -> IFolderView2 QI failed");
-                return false;
+                return null;
             }
             int hr = fv2.GetCurrentFolderFlags(out uint flags);
             Logger.Log($"  GetCurrentFolderFlags hr=0x{hr:X8}, flags=0x{flags:X8} (autoArrange={(flags & FWF_AUTOARRANGE) != 0}, snapToGrid={(flags & FWF_SNAPTOGRID) != 0})");
-            return hr == 0 && (flags & FWF_SNAPTOGRID) != 0;
+            return hr == 0 ? (flags & FWF_SNAPTOGRID) != 0 : null;
         });
     }
 

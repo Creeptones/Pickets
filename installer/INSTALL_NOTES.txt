@@ -7,6 +7,8 @@ WHAT SETUP CHANGES
   The default is your per-user Local AppData\Programs\Pickets folder.
 * Adds a Start menu shortcut.
 * Adds a desktop shortcut only if you leave that option selected.
+  The first-run guide remembers this choice, including when you decline the shortcut.
+* Remembers the installation folder and shortcut choice in your Windows user settings.
 * Starts Pickets at sign-in only if you explicitly select that option.
 
 WHAT SETUP DOES NOT DO
@@ -18,6 +20,7 @@ WHAT SETUP DOES NOT DO
 
 UNINSTALL AND YOUR DATA
 
-Uninstall first asks Pickets to restore captured desktop icons, then removes the app and installer-
+Uninstall first asks Pickets to restore captured desktop icons. If recovery cannot finish, it stops
+before removing files and offers Retry or Cancel. After success, it removes the app and installer-
 created shortcuts. Your layout remains in %APPDATA%\Pickets so reinstalling can recover it. You can
 remove that folder manually if you also want to erase saved layouts and diagnostic logs.

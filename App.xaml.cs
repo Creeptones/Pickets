@@ -57,13 +57,21 @@ public partial class App : Application
         _singleInstance = new SingleInstance();
         if (!_singleInstance.IsFirstInstance)
         {
+            _isSecondaryInstance = true;
+            if (silentRecoveryRequested)
+            {
+                SingleInstance.SignalPrepareRecovery();
+                if (!_singleInstance.WaitForOwnerExit(TimeSpan.FromSeconds(30)))
+                {
+                    Shutdown((int)RecoveryExitCode.OwnerDidNotExit);
+                    return;
+                }
+                Logger.StartSession();
+                RunEmergencyRecovery(silent: true);
+                return;
+            }
             if (recoveryRequested) SingleInstance.SignalRestoreRequest();
             else                   SingleInstance.SignalExistingInstance();
-            // Uninstall waits for the primary instance to finish restoring icons and release the
-            // executable before setup removes files. Ordinary second launches stay instantaneous.
-            if (silentRecoveryRequested)
-                _singleInstance.WaitForOwnerExit(TimeSpan.FromSeconds(30));
-            _isSecondaryInstance = true;
             Shutdown();
             return;
         }
@@ -80,21 +88,12 @@ public partial class App : Application
         }
 
         _layout = LayoutStore.Load();
-        var autoArrange = DesktopIconHider.IsAutoArrangeOn();
-        var snapToGrid = DesktopIconHider.IsSnapToGridOn();
-
-        // First launch explains these prerequisites in context and offers a live recheck. Returning
-        // users still get a concise warning if a Windows update or Explorer setting changed them.
-        if (_layout.HasCompletedOnboarding && (autoArrange || snapToGrid))
+        // Complete readiness before creating windows or hiding any desktop icons.
+        if ((!_layout.HasCompletedOnboarding || !DesktopReadiness.Read().IsReady) && !TryShowWelcome())
         {
-            var problems = (autoArrange ? "\"Auto arrange icons\"" : "") +
-                           (autoArrange && snapToGrid ? " and " : "") +
-                           (snapToGrid ? "\"Align icons to grid\"" : "");
-            MessageBox.Show(
-                $"Your desktop has {problems} enabled. Pickets can only hide " +
-                "icons cleanly when both are OFF.\n\nRight-click the desktop → View → " +
-                "uncheck both, then relaunch.",
-                "Pickets", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _isRecoveryMode = true; // No windows were loaded; do not save an empty profile on exit.
+            Shutdown();
+            return;
         }
 
         _activeProfile = DisplayProfile.CurrentKey();
@@ -163,7 +162,8 @@ public partial class App : Application
         // callback arrives on a thread-pool thread, so hop to the UI thread before touching windows.
         _singleInstance.ListenForRequests(
             () => Dispatcher.BeginInvoke(SurfaceAllPickets),
-            () => Dispatcher.BeginInvoke(() => ReleaseAllCapturedIconsAndQuit(confirm: false)));
+            () => Dispatcher.BeginInvoke(() => ReleaseAllCapturedIconsAndQuit(confirm: false)),
+            () => Dispatcher.BeginInvoke(PrepareForSilentRecovery));
 
         // Re-attach pickets to the new WorkerW whenever Explorer restarts, so they never get orphaned.
         _explorerRestartDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(750) };
@@ -178,16 +178,15 @@ public partial class App : Application
             _explorerRestartDebounce?.Stop();
             _explorerRestartDebounce?.Start();
         });
-
-        if (!_layout.HasCompletedOnboarding)
-            Dispatcher.BeginInvoke(ShowWelcome);
     }
 
-    private void ShowWelcome()
+    private void ShowWelcome() => TryShowWelcome();
+
+    private bool TryShowWelcome()
     {
         var firstRun = !_layout.HasCompletedOnboarding;
         var welcome = new WelcomeWindow(DesktopShortcut.Exists, StartupEntry.IsEnabled);
-        if (welcome.ShowDialog() != true) return;
+        if (welcome.ShowDialog() != true) return false;
 
         if (welcome.CreateDesktopShortcut && !DesktopShortcut.TryCreate(out var shortcutError))
         {
@@ -199,10 +198,12 @@ public partial class App : Application
         else                    StartupEntry.Disable();
 
         _layout.HasCompletedOnboarding = true;
-        SaveLayout();
+        if (_pickets.Count == 0) LayoutStore.Save(_layout);
+        else SaveLayout();
         if (firstRun)
             _tray?.ShowBalloon("Pickets is ready",
                 "Drag in an icon to begin. Reopen the quick start guide from the tray anytime.");
+        return true;
     }
 
     /// <summary>Makes every picket visible and brings them forward -- the response to a second launch
@@ -262,6 +263,7 @@ public partial class App : Application
         {
             Logger.Log($"DispatcherUnhandledException: {args.Exception}");
             args.Handled = true;
+            if (_isRecoveryMode) Shutdown((int)RecoveryExitCode.LayoutUnavailable);
         };
 
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
@@ -543,7 +545,7 @@ public partial class App : Application
         BlurEnabled = s.BlurEnabled,
     };
 
-    private void SaveLayout()
+    private bool SaveLayout()
     {
         // Persist only the active profile -- other profiles in _layout remain untouched.
         var states = _pickets.Select(f => f.ToState()).ToList();
@@ -553,7 +555,7 @@ public partial class App : Application
         // same color/transparency/blur shows on every display the next time that profile loads.
         foreach (var s in states)
             _layout.Appearances[s.Title] = LookOf(s);
-        LayoutStore.Save(_layout);
+        return LayoutStore.TrySave(_layout);
     }
 
     /// <summary>Normal quit: leave the saved ownership metadata intact, but make desktop icons
@@ -634,23 +636,45 @@ public partial class App : Application
     private void RunEmergencyRecovery(bool silent = false)
     {
         _isRecoveryMode = true;
-        _layout = LayoutStore.Load();
+        var recoveredLayout = LayoutStore.LoadForRecovery();
+        if (recoveredLayout == null)
+        {
+            if (!silent) MessageBox.Show("Pickets could not read your saved layouts. Recovery has stopped to protect your desktop icons. Check the diagnostic log and try again.",
+                "Pickets recovery", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Shutdown((int)RecoveryExitCode.LayoutUnavailable);
+            return;
+        }
+        _layout = recoveredLayout;
         _activeProfile = DisplayProfile.CurrentKey();
         var captured = IconCaptureRecovery.Collect(_layout, _activeProfile);
         var restored = RestoreCapturedIcons(captured);
         IconCaptureRecovery.Release(_layout, restored);
-        LayoutStore.Save(_layout);
+        var saved = LayoutStore.TrySave(_layout);
         Logger.Log($"Emergency recovery released {restored.Count} of {captured.Count} captured icon(s).");
 
         if (!silent)
         {
             MessageBox.Show(
                 $"Emergency recovery restored {restored.Count} of {captured.Count} captured desktop icon(s).\n\n" +
-                (restored.Count == captured.Count
+                (!saved ? "The restored state could not be saved. Check folder permissions and retry recovery."
+                    : restored.Count == captured.Count
                     ? "Pickets will no longer hide those icons on future launches."
                     : "Icons Windows could not restore remain captured so you can retry recovery later."),
                 "Pickets recovery", MessageBoxButton.OK,
-                restored.Count == captured.Count ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                saved && restored.Count == captured.Count ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        Shutdown((int)RecoveryOutcome.From(restored.Count, captured.Count, saved));
+    }
+
+    private void PrepareForSilentRecovery()
+    {
+        // The waiting recovery process takes exclusive ownership after this process exits.
+        // Do not exit if its input cannot be saved, or newly captured icons could be missed.
+        _rehideTimer?.Stop();
+        if (!SaveLayout())
+        {
+            _rehideTimer?.Start();
+            return;
         }
         Shutdown();
     }
