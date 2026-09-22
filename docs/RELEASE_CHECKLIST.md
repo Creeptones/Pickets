@@ -197,3 +197,22 @@ collapse/reopen and release matrix remain required; this focused retest does not
 The supplied screenshot is included unchanged, README links were checked, and the first-run guide
 now explains drop locations and safe removal/quit behavior. Normal and small/high-contrast dialog
 renders were inspected; the primary action remains reachable.
+
+### First-release approval (2026-09-22)
+
+The maintainer reported PASS for all four final smoke checks: installation and first-run setup;
+capture, transfer, collapse, and undo; Quit/reopen with icon restoration and saved layout; and
+uninstall with captured icons restored before removal. They approved proceeding with 1.0.0.
+The report did not identify the exact tested executable hashes, so it is recorded as a maintainer
+interaction sign-off rather than verification of the subsequently generated release binaries.
+
+The final pre-package audit at source commit `2674324` passed all 133 tests with no skips. GitHub
+CI for that exact commit passed Release build, tests, portable publishing, installer compilation,
+and uninstall recovery gates. No known vulnerable NuGet packages or missing local documentation
+link targets were reported; private vulnerability reporting is enabled. Release finalization changes
+documentation only. The tagged build must independently pass the release workflow and its downloaded
+assets must match their SHA-256 checksums and GitHub build provenance before publication.
+
+Windows 10, mixed-monitor/DPI configurations, and Narrator remain NOT TESTED live in this sign-off.
+The maintainer approved release with those coverage gaps disclosed; earlier unchecked matrix entries
+are not implicitly marked passed.

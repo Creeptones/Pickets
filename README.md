@@ -18,10 +18,6 @@ Free and open source. No accounts, ads, or telemetry.
 [User guide](docs/USER_GUIDE.md) ·
 [Report a bug](https://github.com/Creeptones/Pickets/issues)
 
-> **Release candidate:** the latest changes still need hands-on sign-off.
-> This README describes the current source; published downloads may differ.
-> See the [short test list](docs/TEST_RELEASE.md).
-
 ## Get started
 
 1. Get **PicketsSetup.exe** from [Releases](https://github.com/Creeptones/Pickets/releases)

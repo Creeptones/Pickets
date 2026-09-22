@@ -5,6 +5,10 @@ All notable changes to Pickets are documented here. Versions follow
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-22
+
+### Release highlights
+
 - Drag feedback is cleared across pickets and after cancelled/finished drags, even if an item
   disappears before its leave event reaches the window. New drags reset the Shell preview session;
   accepted drops are completed in the window preview handler before child controls can consume them.
@@ -33,15 +37,10 @@ All notable changes to Pickets are documented here. Versions follow
   edge scrolling. Context menus apply supported actions to the selection, including reference
   transfers, icon sizing, availability checks, opening, and removal.
 
-## [1.0.0] - release candidate (publication pending)
-
-The first release is awaiting the live Windows checks in `docs/TEST_RELEASE.md`.
-Set the publication date when those checks pass and the release is published.
-
 ### Added
 
 - Movable, resizable, roll-up pickets for desktop icons, with drag-in, drag-out, and lasso capture.
-- Eight coordinated color systems, transparency controls, and optional blur.
+- Ten coordinated color themes, transparency controls, and optional blur.
 - Per-monitor layout profiles and Explorer-restart recovery.
 - Atomic layout persistence, backup recovery, and emergency `--restore-icons` recovery mode.
 - About window with sanitized diagnostic copying.
@@ -84,7 +83,6 @@ Set the publication date when those checks pass and the release is published.
 - Normal Quit restores desktop icons while retaining ownership for the next launch.
 - Former folder portals migrate to ordinary folder shortcuts.
 - Desktop readiness now controls the Start button, with an explanation when readiness is unknown.
-- Features are frozen for the local pre-release test build; see `docs/TEST_BUILD.md`.
 - Installation guidance now walks portable users through choosing a permanent location before
   creating shortcuts or enabling launch at login.
 
