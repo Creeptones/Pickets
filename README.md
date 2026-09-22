@@ -10,7 +10,9 @@ Pickets organizes files, folders, and shortcuts into movable desktop groups. Col
 into a compact stack, find what you need, and expand a section with one click.
 Free and open source. No accounts, ads, or telemetry.
 
-![Pickets on a Windows desktop, with compact connected groups, two rows of icons, and collapsed sections.](docs/images/pickets-desktop.png)
+![Demo: opening Pickets groups, dragging desktop icons into Programs and Personal, then collapsing the groups into a compact stack.](docs/images/pickets-demo.gif)
+
+[View a still screenshot](docs/images/pickets-desktop.png)
 
 [Downloads](https://github.com/Creeptones/Pickets/releases) ·
 [User guide](docs/USER_GUIDE.md) ·
