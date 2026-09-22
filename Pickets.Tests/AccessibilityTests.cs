@@ -17,6 +17,7 @@ public sealed class AccessibilityTests
         protected override void OnStartup(StartupEventArgs e) { }
         protected override void OnExit(ExitEventArgs e) { }
     }
+
     [Fact]
     public void WpfControls_ExposeNamesSelectionAndExpansion_AndRenderWithoutDesktopCapture()
     {
@@ -127,6 +128,7 @@ public sealed class AccessibilityTests
             finally { directory.Delete(true); }
             CheckStackMembershipChanges(app, windows);
             CheckStackRetargeting(app, windows);
+            CheckLabelBodyDropRouting(app, windows);
             CheckReleasePolish(app, windows);
         }
         finally
@@ -135,6 +137,55 @@ public sealed class AccessibilityTests
             app.Frames.Dispose();
             // Do not call App.Shutdown: normal OnExit persists the user's real layout.
             Dispatcher.CurrentDispatcher.InvokeShutdown();
+        }
+    }
+
+    private static void CheckLabelBodyDropRouting(App app, List<PicketWindow> windows)
+    {
+        var window = new PicketWindow(new PicketState
+        {
+            Title = "Drop routing fixture", X = -32000, Y = -32000, Width = 788, Height = 260
+        });
+        windows.Add(window);
+        ((IList<PicketWindow>)app.Pickets).Add(window);
+        for (var i = 0; i < 6; i++) window.Items.Add(new PicketItem { DisplayName = "Reference " + i });
+        window.Items.Add(PicketItem.CreateLabel("Label test"));
+        // Host the real controls offscreen in an ordinary window. PicketWindow is never shown,
+        // so its Explorer parenting and desktop hooks cannot run.
+        var content = window.Content;
+        window.Content = null;
+        var host = new Window { Content = content, Left = -32000, Top = -32000, Width = 788, Height = 260,
+            ShowActivated = false, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
+        host.Show();
+        host.UpdateLayout();
+        try
+        {
+            var body = (ScrollViewer)window.FindName("BodyScroll");
+            var argsConstructor = typeof(DragEventArgs).GetConstructors(System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic).Single();
+            var policy = typeof(PicketWindow).GetMethod("GetDropEffect", System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic)!;
+            var data = new DataObject(DataFormats.FileDrop, new[] { @"Z:\fixture-only\Ephemera Copy.exe" });
+            foreach (var x in new[] { 15.0, 150.0, 400.0, 720.0 })
+            foreach (var y in new[] { 15.0, 100.0, body.ActualHeight - 15 })
+            {
+                var bodyPoint = new Point(x, y);
+                var windowPoint = body.TranslatePoint(bodyPoint, host);
+                var hit = Assert.IsAssignableFrom<UIElement>(host.InputHitTest(windowPoint));
+                var hitPoint = body.TranslatePoint(bodyPoint, hit);
+                var args = (DragEventArgs)argsConstructor.Invoke([data, DragDropKeyStates.LeftMouseButton,
+                    DragDropEffects.Copy | DragDropEffects.Move | DragDropEffects.Link, hit, hitPoint]);
+                Assert.Equal(DragDropEffects.Link, (DragDropEffects)policy.Invoke(window, [args])!);
+            }
+        }
+        finally
+        {
+            host.Content = null;
+            host.Close();
+            window.Content = content;
+            window.CloseForLayoutChange();
+            ((IList<PicketWindow>)app.Pickets).Remove(window);
+            windows.Remove(window);
         }
     }
 

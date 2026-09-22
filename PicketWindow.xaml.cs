@@ -901,6 +901,7 @@ public partial class PicketWindow : Window
     private sealed record PicketItemDragPayload(PicketWindow Source, PicketItem Item);
 
     private readonly ShellDragImage _dropImage = new();
+    private string? _lastDropDecision;
 
     private DragDropEffects GetDropEffect(DragEventArgs e)
     {
@@ -914,20 +915,40 @@ public partial class PicketWindow : Window
     private void Picket_DragOver(object sender, DragEventArgs e)
     {
         e.Effects = GetDropEffect(e);
+        LogDropDecision(e, "hover");
         if (WindowInterop.GetCursorPos(out var cursor))
             _dropImage.Over(new WindowInteropHelper(this).Handle, e.Data, cursor, e.Effects);
         e.Handled = true;
     }
 
-    private void Picket_DragLeave(object sender, DragEventArgs e) => _dropImage.Leave();
+    private void Picket_DragLeave(object sender, DragEventArgs e)
+    {
+        _dropImage.Leave();
+        _lastDropDecision = null;
+    }
 
     private void Picket_PreviewDrop(object sender, DragEventArgs e)
     {
         e.Effects = GetDropEffect(e);
+        LogDropDecision(e, "drop");
         if (WindowInterop.GetCursorPos(out var cursor)) _dropImage.Drop(e.Data, cursor, e.Effects);
         else _dropImage.Leave();
         // Titles keep the preview visible but are not new drop destinations.
         if (e.Effects == DragDropEffects.None) e.Handled = true;
+    }
+
+    private void LogDropDecision(DragEventArgs e, string phase)
+    {
+        var position = e.GetPosition(BodyScroll);
+        var hit = (e.OriginalSource as DependencyObject)?.GetType().Name ?? "unknown";
+        var internalItem = e.Data.GetDataPresent(PicketItemDragFormat);
+        var files = e.Data.GetDataPresent(DataFormats.FileDrop);
+        var decision = $"{phase}/{e.Effects}/{e.AllowedEffects}/{internalItem}/{files}/{hit}/{BodyScroll.IsVisible}";
+        if (_lastDropDecision == decision) return;
+        _lastDropDecision = decision;
+        Logger.Log($"Drop decision: picket={PicketId}, phase={phase}, effect={e.Effects}, allowed={e.AllowedEffects}, " +
+            $"internal={internalItem}, files={files}, hit={hit}, bodyVisible={BodyScroll.IsVisible}, " +
+            $"point=({position.X:F1},{position.Y:F1}), body=({BodyScroll.ActualWidth:F1},{BodyScroll.ActualHeight:F1}).");
     }
 
     private void ItemsHost_Drop(object sender, DragEventArgs e)
