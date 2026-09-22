@@ -36,7 +36,6 @@
             <MenuItem Header="Add label..." Click="TitleMenu_AddLabel_Click"/>
             <Separator/>
             <MenuItem Header="Rename picket..." InputGestureText="F2" Click="TitleMenu_Rename_Click"/>
-            <MenuItem Header="Collapse picket" Tag="Expansion" Click="TitleMenu_ToggleCollapse_Click"/>
             <MenuItem Header="Stack" Tag="StackMenu">
                 <MenuItem Header="Open one picket at a time" Tag="Accordion" IsCheckable="True" Click="TitleMenu_Accordion_Click"/>
                 <MenuItem Header="Move picket earlier" Tag="Earlier" Click="MoveSectionEarlier_Click"/>

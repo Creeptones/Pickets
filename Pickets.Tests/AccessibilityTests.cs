@@ -125,6 +125,7 @@ public sealed class AccessibilityTests
                 Assert.Single(windows[2].Items, i => i.Path == path);
             }
             finally { directory.Delete(true); }
+            CheckStackMembershipChanges(app, windows);
             CheckReleasePolish(app, windows);
         }
         finally
@@ -132,6 +133,94 @@ public sealed class AccessibilityTests
             foreach (var window in windows) window.CloseForLayoutChange();
             // Do not call App.Shutdown: normal OnExit persists the user's real layout.
             Dispatcher.CurrentDispatcher.InvokeShutdown();
+        }
+    }
+
+    private static void CheckStackMembershipChanges(App app, List<PicketWindow> windows)
+    {
+        // Exercise the real windows and App deletion path without showing them on the desktop.
+        foreach (var horizontal in new[] { false, true })
+        foreach (var accordion in horizontal ? new[] { false } : new[] { false, true })
+        {
+            var members = new List<PicketWindow>();
+            var id = Guid.NewGuid().ToString();
+            for (var i = 0; i < 4; i++)
+            {
+                var member = new PicketWindow(new PicketState
+                {
+                    Title = "Membership " + i, GroupId = id, GroupOrder = i,
+                    GroupHorizontal = horizontal, AccordionMode = accordion,
+                    IsCollapsed = i != 0, Width = 200, Height = 160, X = 30, Y = 30 + i * 32
+                });
+                members.Add(member);
+                windows.Add(member);
+                ((IList<PicketWindow>)app.Pickets).Add(member);
+            }
+            members[0].NormalizeConnectedGroup();
+            var menu = (ContextMenu)members[0].Resources["TitleContextMenu"];
+            Assert.DoesNotContain(menu.Items.OfType<MenuItem>(), item =>
+                Equals(item.Header, "Collapse picket") || Equals(item.Header, "Expand picket") || Equals(item.Tag, "Expansion"));
+
+            var added = new PicketWindow(new PicketState { Title = "Inserted", Width = 320, Height = 240 });
+            windows.Add(added);
+            ((IList<PicketWindow>)app.Pickets).Add(added);
+            added.AttachAfter(members[1]);
+            members.Insert(2, added);
+            CheckSeams();
+            Assert.Equal(horizontal, added.ToState().GroupHorizontal);
+            Assert.Equal(accordion, added.ToState().AccordionMode);
+            if (accordion) Assert.Same(added, Assert.Single(members, p => !p.ToState().IsCollapsed));
+
+            // Model an in-flight animation owned by a different section. Deletion must finish
+            // it while the old members still exist, before closing the gap for the new stack.
+            var finishField = typeof(PicketWindow).GetField("_finishRollAnimation",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            var settled = false;
+            finishField.SetValue(members[0], (Action)(() =>
+            {
+                Assert.Contains(added, app.Pickets);
+                settled = true;
+                finishField.SetValue(members[0], null);
+                members[^1].Top += 160;
+            }));
+            app.DeletePicket(added);
+            Assert.True(settled);
+            members.Remove(added);
+            windows.Remove(added);
+            CheckSeams();
+
+            // Deleting the first section must not move the whole stack down/right into its hole.
+            var first = members[0];
+            var anchor = new Point(first.Left, first.Top);
+            app.DeletePicket(first);
+            members.Remove(first);
+            windows.Remove(first);
+            Assert.Equal(anchor.X, members[0].Left, 6);
+            Assert.Equal(anchor.Y, members[0].Top, 6);
+            CheckSeams();
+            var last = members[^1];
+            app.DeletePicket(last);
+            members.Remove(last);
+            windows.Remove(last);
+            CheckSeams();
+            foreach (var member in members)
+            {
+                app.DeletePicket(member);
+                windows.Remove(member);
+            }
+
+            void CheckSeams()
+            {
+                Assert.All(members, p => Assert.Equal(id, p.GroupId));
+                Assert.Equal(Enumerable.Range(0, members.Count), members.Select(p => p.GroupOrder));
+                for (var i = 1; i < members.Count; i++)
+                {
+                    Assert.Equal(members[0].Width, members[i].Width, 6);
+                    Assert.Equal(horizontal ? members[i - 1].Left + members[i - 1].Width
+                        : members[i - 1].Top + members[i - 1].Height,
+                        horizontal ? members[i].Left : members[i].Top, 6);
+                }
+            }
         }
     }
 

@@ -81,10 +81,41 @@ public partial class PicketWindow
             ? app.Pickets.Where(p => p.GroupId == GroupId).OrderBy(p => p.GroupOrder).ThenBy(p => p.PicketId).ToList()
             : new List<PicketWindow> { this };
 
+    internal List<PicketWindow> SettleStack()
+    {
+        var group = ComputeTouchingCluster();
+        // The timer belongs to the section that initiated expansion, which need not be the
+        // section being added to or removed. Finish it before changing membership or bounds.
+        foreach (var member in group) member._finishRollAnimation?.Invoke();
+        return group;
+    }
+
+    internal void AttachAfter(PicketWindow previous)
+    {
+        SettleStack();
+        var group = previous.SettleStack();
+        if (group.Contains(this)) return;
+        var first = group[0];
+        GroupId = first.GroupId;
+        _groupHorizontal = first._groupHorizontal;
+        _accordionMode = first._accordionMode;
+        _expandedHeight = first._expandedHeight;
+        _stackPageIndex = first._stackPageIndex;
+        Width = first.Width;
+        NeedsGroupMigration = false;
+        group.Insert(group.IndexOf(previous) + 1, this);
+        for (var i = 0; i < group.Count; i++) group[i].GroupOrder = i;
+        if (_accordionMode)
+            foreach (var member in group) member._isCollapsed = member != this;
+        NormalizeConnectedGroup();
+        RevealOnStackPage();
+    }
+
     internal void JoinTouchingGroups(bool migrateOnly = false)
     {
-        var cluster = ComputeTouchingCluster();
+        var cluster = SettleStack();
         if (Application.Current is not App app) return;
+        foreach (var candidate in app.Pickets) candidate._finishRollAnimation?.Invoke();
         var originalCount = cluster.Count;
         bool added;
         do
@@ -125,14 +156,16 @@ public partial class PicketWindow
 
     public void NormalizeConnectedGroup()
     {
-        var group = ComputeTouchingCluster();
+        var group = SettleStack();
         if (group.Count == 0) return;
         var first = group[0];
         var width = Math.Max(group.Max(p => p.MinWidth), first.Width);
         var expanded = Math.Max(96, first._expandedHeight);
         var open = group.FirstOrDefault(p => !p._isCollapsed);
-        foreach (var p in group)
+        for (var i = 0; i < group.Count; i++)
         {
+            var p = group[i];
+            p.GroupOrder = i;
             p._expandedHeight = expanded;
             p._groupHorizontal = first._groupHorizontal;
             p._accordionMode = first._accordionMode;

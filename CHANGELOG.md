@@ -44,6 +44,9 @@ Set the publication date when those checks pass and the release is published.
 
 ### Fixed
 
+- Adding a picket from a title menu or Ctrl+N joins the invoking stack directly; deleting a
+  section closes the gap and keeps the stack anchored. Stack reflow finishes pending expansion
+  animations before changing membership. The redundant expand/collapse title-menu entry is removed.
 - Display-profile changes restore captures absent from the incoming profile before replacing their
   windows; failed saves or restores retain the current pickets for recovery.
 - Normal Quit includes captured icons from every saved display profile.

@@ -70,7 +70,7 @@ public partial class PicketWindow
         else if (ctrl && key is Key.PageUp or Key.PageDown) ChangeStackPage(key == Key.PageUp ? -1 : 1);
         else if (key == Key.Tab && ctrl && Application.Current is App app) app.FocusNextPicket(this, shift ? -1 : 1);
         else if (key == Key.O && ctrl && !alt) { if (shift) AddFolder(); else AddFiles(); }
-        else if (key == Key.N && ctrl && Application.Current is App createApp) createApp.CreatePicket(Left + 30, Top + 30);
+        else if (key == Key.N && ctrl && Application.Current is App createApp) createApp.CreatePicket(Left + 30, Top + 30, this);
         else if (key == Key.F2) BeginRename();
         else if (key == Key.Escape) { SetExpanded(false); TitleToggle.Focus(); }
         else if (key == Key.Delete && ItemsHost.IsKeyboardFocusWithin) RemoveReferences(ItemsHost.SelectedItems.Cast<PicketItem>());

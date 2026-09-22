@@ -534,8 +534,9 @@ public partial class App : Application
 
     public int PicketCount => _pickets.Count;
 
-    public PicketWindow CreatePicket(double x, double y)
+    public PicketWindow CreatePicket(double x, double y, PicketWindow? attachAfter = null)
     {
+        attachAfter?.SettleStack();
         var state = new PicketState
         {
             Title = "New picket",
@@ -544,7 +545,8 @@ public partial class App : Application
             ColorKey = PicketColors.Get(_layout.DefaultColorKey).Key,
         };
         var picket = SpawnPicket(state);
-        picket.JoinTouchingGroups();
+        if (attachAfter != null) picket.AttachAfter(attachAfter);
+        else picket.JoinTouchingGroups();
         picket.FocusForKeyboard();
         MarkDirty();
         return picket;
@@ -552,10 +554,18 @@ public partial class App : Application
 
     public void DeletePicket(PicketWindow picket)
     {
+        var group = picket.SettleStack();
+        var anchor = new Point(group[0].Left, group[0].Top);
         if (!picket.TryReleaseAllReferences()) return;
         _pickets.Remove(picket);
         picket.CloseForLayoutChange();
-        _pickets.FirstOrDefault(p => p.GroupId == picket.GroupId)?.NormalizeConnectedGroup();
+        var remaining = group.Where(p => p != picket).ToList();
+        if (remaining.Count > 0)
+        {
+            remaining[0].Left = anchor.X;
+            remaining[0].Top = anchor.Y;
+            remaining[0].NormalizeConnectedGroup();
+        }
         MarkDirty();
     }
 

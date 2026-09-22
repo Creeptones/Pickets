@@ -150,6 +150,10 @@ header's **‹ / ›** buttons, **Stack → Previous / Next page**, or **Ctrl+Pa
 **Ctrl+Tab** also reveals the page containing the next picket. Pages do not split membership or
 change saved order; the first page is shown after restart. Paged stacks change instantly.
 
+Creating a picket from a title menu or with **Ctrl+N** inserts it directly after that picket in the
+same stack. Deleting a section closes the gap automatically and preserves the stack's position.
+Click a title or focus it and press **Space** to expand or collapse; the title menu omits this action.
+
 ### File references, not file operations
 
 **Add files / Add folders** stores references without moving, copying, hiding, or creating shortcuts.

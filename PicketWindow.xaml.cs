@@ -389,12 +389,10 @@ public partial class PicketWindow : Window
     // === Title context menu ===
     private void TitleMenu_Rename_Click(object sender, RoutedEventArgs e) => BeginRename();
 
-    private void TitleMenu_ToggleCollapse_Click(object sender, RoutedEventArgs e) => ToggleCollapse();
-
     private void TitleMenu_NewPicket_Click(object sender, RoutedEventArgs e)
     {
         if (Application.Current is App app)
-            app.CreatePicket(Left + 30, Top + 30);
+            app.CreatePicket(Left + 30, Top + 30, this);
     }
 
     private void AddPicketBtn_Click(object sender, RoutedEventArgs e)
@@ -402,7 +400,7 @@ public partial class PicketWindow : Window
         // Mark handled so the title bar's drag-move doesn't pick this click up.
         e.Handled = true;
         if (Application.Current is App app)
-            app.CreatePicket(Left + 30, Top + 30);
+            app.CreatePicket(Left + 30, Top + 30, this);
     }
 
     private void UnlinkBtn_Click(object sender, RoutedEventArgs e) => UnlinkGroup();
@@ -561,7 +559,6 @@ public partial class PicketWindow : Window
     {
         var group = ComputeTouchingCluster();
         var position = group.IndexOf(this);
-        if (FindMenuItemByTag(cm.Items, "Expansion") is MenuItem expansion) expansion.Header = _isCollapsed ? "Expand picket" : "Collapse picket";
         if (FindMenuItemByTag(cm.Items, "StackMenu") is MenuItem stack)
         {
             stack.IsEnabled = group.Count > 1;
