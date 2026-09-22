@@ -136,3 +136,14 @@ the drag ends or is cancelled and when the window closes.
 enter/over/leave/drop/disposal, payload preservation, effect filtering, and 100–200% preview renders.
 The rendered previews were inspected. Live Explorer, cancellation, desktop restoration, and
 mixed-DPI dragging still require the short test-list pass.
+
+### Live drag follow-up (2026-09-22)
+
+The user passed the incoming desktop preview/boundary/Escape check. A subsequent drag showed a
+blocked cursor throughout Programs while other sections accepted it. Programs had no duplicate
+of the dragged file and its native window was enabled with an OLE drop target registered.
+An isolated test of the real controls with six references and a label accepted drops across the body.
+After restarting into diagnostic build `6a8a009`, the user reported that Programs worked again.
+The trace confirms Link acceptance for incoming files over the grid, item borders, scroll viewer,
+and label text. This records recovery after restart, not a confirmed root-cause fix. Repeat after
+collapse/expand and normal use before closing this intermittent issue; retain the drop trace if it recurs.
