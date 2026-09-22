@@ -78,7 +78,7 @@ jobs:
             release/SHA256SUMS.txt
           if-no-files-found: error
 
-      - name: Create GitHub release
+      - name: Create draft GitHub release for final review
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -88,5 +88,6 @@ jobs:
             release/Pickets.exe `
             release/SHA256SUMS.txt `
             --verify-tag `
+            --draft `
             --generate-notes `
             --title "Pickets $env:GITHUB_REF_NAME"

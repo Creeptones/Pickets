@@ -108,26 +108,28 @@ public static class LayoutStore
 
     public static string BackupPath => LayoutPath + ".bak";
 
-    public static LayoutFile Load()
+    public static LayoutFile? Load() => Load(LayoutPath, BackupPath);
+
+    internal static LayoutFile? Load(string primaryPath, string backupPath)
     {
-        var primary = TryLoad(LayoutPath, out var primaryError);
+        var primary = TryLoad(primaryPath, out var primaryError);
         if (primary != null)
             return primary;
 
         if (primaryError != null)
-            Logger.Log($"Could not read primary layout '{LayoutPath}': {primaryError}");
+            Logger.Log($"Could not read primary layout '{primaryPath}': {primaryError}");
 
-        var backup = TryLoad(BackupPath, out var backupError);
+        var backup = TryLoad(backupPath, out var backupError);
         if (backup != null)
         {
-            Logger.Log($"Recovered layout from backup '{BackupPath}'.");
+            Logger.Log($"Recovered layout from backup '{backupPath}'.");
             return backup;
         }
 
         if (backupError != null)
-            Logger.Log($"Could not read backup layout '{BackupPath}': {backupError}");
+            Logger.Log($"Could not read backup layout '{backupPath}': {backupError}");
 
-        return DefaultLayout();
+        return primaryError == null && backupError == null ? DefaultLayout() : null;
     }
 
     // Recovery must not mistake an unreadable layout for an empty desktop.
@@ -224,21 +226,49 @@ public static class LayoutStore
         catch { return null; }
         if (root is not JsonObject obj) return null;
 
-        int version = obj["Version"]?.GetValue<int>() ?? 1;
+        var version = 1;
+        if (obj.ContainsKey("Version") &&
+            (obj["Version"] is not JsonValue value || !value.TryGetValue(out version))) return null;
 
-        if (version >= 2)
+        if (version == 2)
         {
+            // Validate ownership-bearing structures before Normalize can turn nulls into empty
+            // collections. Otherwise an unreadable primary would mask a good recovery backup.
+            if (obj["Profiles"] is not JsonObject profiles ||
+                profiles.Any(profile => !IsStateArray(profile.Value)) ||
+                (obj["LastProfileSeed"] != null && !IsStateArray(obj["LastProfileSeed"]))) return null;
             return JsonSerializer.Deserialize<LayoutFile>(json, Options);
         }
 
+        if (version != 1 || !IsStateArray(obj["Fences"])) return null;
         // V1 migration: wrap the legacy Pickets list under a sentinel profile key.
-        var legacyPickets = obj["Fences"]?.Deserialize<List<PicketState>>(Options) ?? new();
+        var legacyPickets = obj["Fences"]!.Deserialize<List<PicketState>>(Options)!;
         return new LayoutFile
         {
             Version = 2,
             Profiles = new Dictionary<string, List<PicketState>> { ["_legacy"] = legacyPickets },
             LastProfileSeed = legacyPickets,
         };
+    }
+
+    private static bool IsStateArray(JsonNode? node)
+        => node is JsonArray states && states.All(state => state is JsonObject picket &&
+            (!picket.ContainsKey("Items") ||
+             picket["Items"] is JsonArray items && items.All(IsItem)));
+
+    private static bool IsItem(JsonNode? node)
+    {
+        if (node is not JsonObject item) return false;
+        var kind = (int)ItemKind.File;
+        if (item.ContainsKey("Kind") &&
+            (item["Kind"] is not JsonValue kindValue || !kindValue.TryGetValue(out kind))) return false;
+        if (kind != (int)ItemKind.File && kind != (int)ItemKind.Label) return false;
+        if (kind == (int)ItemKind.File &&
+            (item["Path"] is not JsonValue path || !path.TryGetValue<string>(out var text) ||
+             string.IsNullOrWhiteSpace(text))) return false;
+        if (item["OriginalX"] == null && item["OriginalY"] == null) return true;
+        return item["OriginalX"] is JsonValue x && x.TryGetValue<int>(out _) &&
+               item["OriginalY"] is JsonValue y && y.TryGetValue<int>(out _);
     }
 
     /// <summary>Returns the picket list for the current profile, creating it from the last-used

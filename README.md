@@ -13,9 +13,10 @@ inside movable, translucent groups at the wallpaper layer. Your files stay in th
 
 ## Test-build feature freeze
 
-The pre-release UX and safety pass is frozen for hands-on testing. No further features are planned
-before test sign-off; only release-blocking fixes. See the [focused test plan](docs/TEST_BUILD.md)
-and [full release checklist](docs/RELEASE_CHECKLIST.md). A local rebuild is not a new public release.
+The release candidate is ready for hands-on validation after the recovery fixes. No further features
+are planned before test sign-off; only release-blocking fixes. Start with the
+[short, step-by-step test list](docs/TEST_RELEASE.md). The [full release checklist](docs/RELEASE_CHECKLIST.md)
+tracks final sign-off. A local rebuild is not a new public release.
 
 ## Install and first run
 
@@ -233,6 +234,8 @@ Layouts and diagnostic logs stay under `%APPDATA%\Pickets`:
 
 Layout saves use atomic replacement so an interrupted write does not overwrite the only good copy.
 If the primary layout cannot be read, Pickets automatically attempts to load the backup.
+Unrecognized layouts and unsupported schema versions also trigger backup recovery. If neither saved
+copy is readable, Pickets stops and leaves both files unchanged so recovery can be investigated.
 
 If Pickets cannot start normally, run the portable executable from PowerShell or Command Prompt:
 
@@ -308,7 +311,8 @@ requests are also compiled and publish-checked on Windows through GitHub Actions
 Pushing a version tag that matches `Pickets.csproj` (for example, `v1.0.0`) runs the release
 workflow. It tests and publishes the app, builds the per-user installer, creates
 `SHA256SUMS.txt`, records GitHub build provenance for both executables, and attaches the installer,
-portable executable, and checksums to a GitHub Release.
+portable executable, and checksums to a draft GitHub Release. Review the notes, complete the live
+test sign-off, and verify the assets and provenance before publishing the draft.
 
 ## Troubleshooting
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Pickets;
 
@@ -9,6 +10,26 @@ internal readonly record struct CapturedDesktopIcon(string Path, POINT OriginalP
 /// then the latest seed, so duplicate paths use the position most likely to match this desktop.</summary>
 internal static class IconCaptureRecovery
 {
+    internal static bool TryRestore(CapturedDesktopIcon icon,
+        Func<CapturedDesktopIcon, bool> restore, Func<string, ReferenceStatus> check)
+        // Offline or inaccessible paths are not proof that the captured item was deleted.
+        => restore(icon) || check(icon.Path) == ReferenceStatus.Missing;
+
+    // Keep ownership metadata intact: returning to an older profile must still collect its icons.
+    // The caller must keep the current windows when restoration fails so recovery stays reachable.
+    internal static bool TryRestoreInactive(LayoutFile layout, string currentProfile,
+        IEnumerable<PicketState> incoming, Func<CapturedDesktopIcon, bool> restore)
+    {
+        var retained = incoming.SelectMany(state => state.Items)
+            .Where(item => item.HasOriginalPos)
+            .Select(item => item.Path)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var succeeded = true;
+        foreach (var icon in Collect(layout, currentProfile))
+            if (!retained.Contains(icon.Path) && !restore(icon)) succeeded = false;
+        return succeeded;
+    }
+
     public static IReadOnlyList<CapturedDesktopIcon> Collect(LayoutFile layout, string preferredProfile)
     {
         var captured = new Dictionary<string, POINT>(StringComparer.OrdinalIgnoreCase);

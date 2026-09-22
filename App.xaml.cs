@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Interop;
@@ -89,7 +88,16 @@ public partial class App : Application
             return;
         }
 
-        _layout = LayoutStore.Load();
+        var loadedLayout = LayoutStore.Load();
+        if (loadedLayout == null)
+        {
+            _isRecoveryMode = true; // Never overwrite unreadable layouts with an empty session.
+            MessageBox.Show("Pickets could not read your saved layout or its backup. Your saved files have been left unchanged. Check the diagnostic log before trying again.",
+                "Pickets recovery", MessageBoxButton.OK, MessageBoxImage.Warning);
+            Shutdown((int)RecoveryExitCode.LayoutUnavailable);
+            return;
+        }
+        _layout = loadedLayout;
         // Complete readiness before creating windows or hiding any desktop icons.
         if ((!_layout.HasCompletedOnboarding || !DesktopReadiness.Read().IsReady) && !TryShowWelcome())
         {
@@ -346,24 +354,27 @@ public partial class App : Application
         {
             // Same monitors, but a picket might have landed off the new work area (Parsec can
             // shift the work-area origin without changing resolution strings). Re-clamp in place.
-            foreach (var f in _pickets)
-            {
-                var state = f.ToState();
-                DisplayProfile.ClampToVisibleWorkArea(state);
-                f.Left = state.X; f.Top = state.Y;
-                f.Width = state.Width; f.Height = state.Height;
-            }
-            foreach (var group in _pickets.GroupBy(p => p.GroupId)) group.First().NormalizeConnectedGroup();
-            MarkDirty();
+            ClampPicketsToWorkArea();
             return;
         }
 
         Logger.Log($"Display profile changed: '{_activeProfile}' -> '{newKey}'");
 
-        // Snapshot current pickets into the outgoing profile and keep as the seed for new profiles.
-        var outgoing = _pickets.Select(f => f.ToState()).ToList();
-        _layout.Profiles[_activeProfile] = outgoing;
-        _layout.LastProfileSeed = outgoing;
+        // Persist current captures before replacing their windows. A failed save/restore keeps
+        // those windows available, clamped to the new display so the user can still recover.
+        if (!SaveLayout())
+        {
+            ClampPicketsToWorkArea();
+            _tray?.ShowBalloon("Display layout kept", "Pickets could not save your layout. Your current pickets remain available; check the diagnostic log.");
+            return;
+        }
+        var incoming = LayoutStore.GetOrSeedProfile(_layout, newKey);
+        if (!IconCaptureRecovery.TryRestoreInactive(_layout, _activeProfile, incoming, RestoreCapturedIcon))
+        {
+            ClampPicketsToWorkArea();
+            _tray?.ShowBalloon("Desktop icons need recovery", "Windows could not restore every icon. Your current pickets were kept; choose Quit Pickets to retry recovery.");
+            return;
+        }
 
         // Close current picket windows -- positions in the new monitor space differ entirely.
         foreach (var f in _pickets.ToList())
@@ -377,6 +388,19 @@ public partial class App : Application
             CreatePicket(200, 200);
 
         SaveLayout();
+    }
+
+    private void ClampPicketsToWorkArea()
+    {
+        foreach (var picket in _pickets)
+        {
+            var state = picket.ToState();
+            DisplayProfile.ClampToVisibleWorkArea(state);
+            picket.Left = state.X; picket.Top = state.Y;
+            picket.Width = state.Width; picket.Height = state.Height;
+        }
+        foreach (var group in _pickets.GroupBy(p => p.GroupId)) group.First().NormalizeConnectedGroup();
+        MarkDirty();
     }
 
     /// <summary>Spawns a picket sized to the lasso rect, capturing any desktop icons inside it.</summary>
@@ -601,12 +625,15 @@ public partial class App : Application
         // straight back off-screen.
         _rehideTimer?.Stop();
 
-        var captured = _pickets.SelectMany(picket => picket.Items)
-            .Where(item => item.OriginalDesktopPos.HasValue)
-            .GroupBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new CapturedDesktopIcon(
-                group.Key, group.First().OriginalDesktopPos!.Value))
-            .ToList();
+        if (!SaveLayout())
+        {
+            _rehideTimer?.Start();
+            MessageBox.Show("Pickets could not save your layout. It will stay open so captured icons remain recoverable. Check the diagnostic log and try again.",
+                "Pickets", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        // Include captures from previous display profiles, including older stranded icons.
+        var captured = IconCaptureRecovery.Collect(_layout, _activeProfile);
         var restored = RestoreCapturedIcons(captured);
         if (restored.Count != captured.Count)
         {
@@ -713,14 +740,16 @@ public partial class App : Application
         var restored = new List<string>();
         foreach (var icon in captured)
         {
-            // There is no desktop icon left to unhide when its backing item was deleted. Treat it
-            // as released so stale capture metadata cannot make emergency recovery fail forever.
-            if ((!File.Exists(icon.Path) && !Directory.Exists(icon.Path)) ||
-                DesktopIconHider.Restore(icon.Path, icon.OriginalPosition))
+            if (RestoreCapturedIcon(icon))
                 restored.Add(icon.Path);
         }
         return restored;
     }
+
+    private static bool RestoreCapturedIcon(CapturedDesktopIcon icon)
+        => IconCaptureRecovery.TryRestore(icon,
+            captured => DesktopIconHider.Restore(captured.Path, captured.OriginalPosition),
+            path => FileReferenceProbe.Check(path).Status);
 
     public static void ShowAbout() => new AboutWindow().ShowDialog();
 }

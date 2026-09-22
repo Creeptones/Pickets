@@ -1,11 +1,15 @@
 # Pickets release checklist
 
+Start with the [short, ordered hands-on test list](TEST_RELEASE.md). Record PASS, FAIL, or
+NOT TESTED; an unavailable machine or display configuration is not a pass.
+
 ## Version and source
 
 - [ ] Update `Version`, `AssemblyVersion`, and `FileVersion` in `Pickets.csproj`.
 - [ ] Move notable changes from **Unreleased** into the dated changelog entry.
 - [ ] Confirm the README describes the shipped controls and requirements.
 - [ ] Confirm the working tree is clean and CI passes on `main`.
+- [ ] Confirm private vulnerability reporting is enabled and the security policy links to it.
 
 ## Automated verification
 
@@ -32,6 +36,7 @@
 - [ ] 100%, 125%, 150%, and 200% display scaling.
 - [ ] Mixed-DPI multi-monitor arrangement.
 - [ ] Dock, undock, and reconnect a monitor.
+- [ ] Capture in profile A, remove from B, return to A and then B; the icon restores in B and after Quit.
 - [ ] Restart Windows Explorer while Pickets is running.
 - [ ] Force-terminate Pickets, relaunch it, and inspect the previous-session log.
 - [ ] Drag desktop icons in, between pickets, and back out.
@@ -82,5 +87,19 @@ and the success case allowed uninstall.
 - [ ] Create and push an annotated tag matching the project version, for example `v1.0.0`.
 - [ ] Confirm the release workflow attaches `PicketsSetup.exe`, `Pickets.exe`, and `SHA256SUMS.txt`.
 - [ ] Verify the GitHub build-provenance attestation.
+- [ ] Review the draft release and record live test sign-off before publishing it.
 - [ ] Download the public asset on a clean machine and confirm its SHA-256 checksum.
 - [ ] Review generated release notes before announcing the release.
+
+### Release-audit fixes (2026-09-22)
+
+Profile transitions restore inactive captures before closing their windows; failed saves or recovery
+keep the current windows available. Normal Quit collects across all saved profiles. Layout loading
+rejects unknown schemas and invalid ownership structures, uses a valid backup, and stops without
+overwriting data if both copies are unreadable. Regression tests exercise these cases, including
+profile round-trips and failure/retry. Private vulnerability reporting was enabled and verified.
+Release tags now create a draft for final review. The live Windows matrix still requires sign-off.
+Local verification: 98 tests passed with no skipped tests; Release compilation passed with warnings
+treated as errors. Portable publishing, installer compilation, and all five uninstall recovery-fixture
+cases passed. The final candidate's source ID and hashes are recorded in `release/TEST_BUILD.txt`
+and `release/SHA256SUMS.txt`; these local checks do not replace CI on the eventual `main` commit.

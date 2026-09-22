@@ -5,8 +5,19 @@ All notable changes to Pickets are documented here. Versions follow
 
 ## [Unreleased]
 
+## [1.0.0] - release candidate (publication pending)
+
+The first release is awaiting the live Windows checks in `docs/TEST_RELEASE.md`.
+Set the publication date when those checks pass and the release is published.
+
 ### Added
 
+- Movable, resizable, roll-up pickets for desktop icons, with drag-in, drag-out, and lasso capture.
+- Eight coordinated color systems, transparency controls, and optional blur.
+- Per-monitor layout profiles and Explorer-restart recovery.
+- Atomic layout persistence, backup recovery, and emergency `--restore-icons` recovery mode.
+- About window with sanitized diagnostic copying.
+- Self-contained Windows x64 release packaging, checksums, and build provenance.
 - Actionable empty pickets, expansion chevrons, explicit title menus, and outside-corner resize hints.
 - Work-area-aware paging for oversized stacks, with header controls and Ctrl+PageUp/PageDown.
 - Scrollable, resizable About and keyboard-help windows sharing onboarding's high-contrast styling.
@@ -24,6 +35,8 @@ All notable changes to Pickets are documented here. Versions follow
 ### Changed
 
 - Simplified reference and stack terminology; advanced recovery actions are separated from everyday controls.
+- Normal Quit restores desktop icons while retaining ownership for the next launch.
+- Former folder portals migrate to ordinary folder shortcuts.
 - Desktop readiness now controls the Start button, with an explanation when readiness is unknown.
 - Features are frozen for the local pre-release test build; see `docs/TEST_BUILD.md`.
 - Installation guidance now walks portable users through choosing a permanent location before
@@ -31,6 +44,12 @@ All notable changes to Pickets are documented here. Versions follow
 
 ### Fixed
 
+- Display-profile changes restore captures absent from the incoming profile before replacing their
+  windows; failed saves or restores retain the current pickets for recovery.
+- Normal Quit includes captured icons from every saved display profile.
+- Unrecognized, structurally invalid, and unsupported layout schemas fall back to a valid backup.
+  If neither saved copy is readable, startup and emergency recovery stop without overwriting them.
+- Unavailable file locations are not treated as deleted when deciding whether recovery succeeded.
 - Alt+F4 and ordinary picket-window close requests safely hide Pickets without losing tracked windows
   or desktop-icon recovery metadata; application-managed teardown remains explicit.
 - Launch availability checks no longer await thumbnail generation. Compact unavailable statuses retain
@@ -50,25 +69,6 @@ All notable changes to Pickets are documented here. Versions follow
   fractional display scaling.
 - Connected pickets now keep a single shared size, resize together from the group's outside
   boundary, and automatically close small gaps left by older layouts.
-
-## [1.0.0] - 2026-09-21
-
-### Added
-
-- Movable, resizable, roll-up pickets for desktop icons.
-- Drag-in, drag-out, and Shift + right-drag lasso interactions.
-- Connected picket movement, resizing, snapping, and unlinking.
-- Eight coordinated color systems, transparency controls, and optional blur.
-- Per-monitor layout profiles and Explorer-restart recovery.
-- Atomic layout persistence with automatic backup recovery.
-- Emergency `--restore-icons` recovery mode.
-- About window with sanitized diagnostic copying.
-- Self-contained Windows x64 release packaging and build provenance.
-
-### Changed
-
-- Normal Quit restores desktop icon visibility while retaining the picket layout for the next run.
-- Folder portals migrate to ordinary folder shortcuts for a simpler interaction model.
 
 [Unreleased]: https://github.com/Creeptones/Pickets/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/Creeptones/Pickets/releases/tag/v1.0.0
