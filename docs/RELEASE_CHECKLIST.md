@@ -103,3 +103,13 @@ Local verification: 98 tests passed with no skipped tests; Release compilation p
 treated as errors. Portable publishing, installer compilation, and all five uninstall recovery-fixture
 cases passed. The final candidate's source ID and hashes are recorded in `release/TEST_BUILD.txt`
 and `release/SHA256SUMS.txt`; these local checks do not replace CI on the eventual `main` commit.
+
+### App-wide rendering follow-up (2026-09-22)
+
+All stack expansion and accordion motion now uses one WPF rendering subscription, with deferred
+border/handle refreshes shared by all pickets. Dragging and resizing no longer refresh every
+intermediate geometry change; corner resizing performs one reflow. The loop detaches when idle.
+109 tests passed, including simulated 60/120/144/165/240 Hz callback schedules, duplicate-frame
+filtering, batched updates, cleanup, and WPF stack resizing. These are scheduling/behavior checks,
+not measurements of displayed FPS. The live motion test and diagnostic callback timings should
+be checked on the target displays before release.

@@ -131,6 +131,7 @@ public sealed class AccessibilityTests
         finally
         {
             foreach (var window in windows) window.CloseForLayoutChange();
+            app.Frames.Dispose();
             // Do not call App.Shutdown: normal OnExit persists the user's real layout.
             Dispatcher.CurrentDispatcher.InvokeShutdown();
         }
@@ -157,6 +158,20 @@ public sealed class AccessibilityTests
                 ((IList<PicketWindow>)app.Pickets).Add(member);
             }
             members[0].NormalizeConnectedGroup();
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var resizeField = typeof(PicketWindow).GetField("_resizeCluster", flags)!;
+            resizeField.SetValue(members[0], members);
+            typeof(PicketWindow).GetField("_resizeOrientation", flags)!.SetValue(members[0],
+                horizontal ? GroupOrientation.Row : GroupOrientation.Column);
+            var widthBefore = members[0].Width;
+            var heightBefore = members[0].ToState().Height;
+            typeof(PicketWindow).GetMethod("ResizeCluster", flags)!.Invoke(members[0], [60.0, 30.0]);
+            resizeField.SetValue(members[0], null);
+            var requestedWidth = widthBefore + (horizontal ? 15 : 60);
+            var pixelWidth = 1 / VisualTreeHelper.GetDpi(members[0]).DpiScaleX;
+            Assert.All(members, p => Assert.InRange(p.Width, requestedWidth - pixelWidth, requestedWidth + 0.000001));
+            Assert.All(members, p => Assert.Equal(heightBefore + 30, p.ToState().Height, 6));
+            CheckSeams();
             var menu = (ContextMenu)members[0].Resources["TitleContextMenu"];
             Assert.DoesNotContain(menu.Items.OfType<MenuItem>(), item =>
                 Equals(item.Header, "Collapse picket") || Equals(item.Header, "Expand picket") || Equals(item.Tag, "Expansion"));

@@ -26,6 +26,10 @@ Build: use `release/Pickets.exe` and `release/PicketsSetup.exe` from this checko
 - [ ] **References stay references.** Add the same disposable file through **Add files** in two
       pickets. Remove one reference.
       **Pass:** the original file and the other reference still exist.
+- [ ] **Motion across the app.** Open/close several different pickets, switch accordion sections,
+      drag a connected stack, and resize its outer corner.
+      **Pass:** sections and arrows move together, seams stay flush, and the final size/order saves.
+      Try the same with Windows animations disabled: expansion should finish immediately.
 
 **Round 2 — the recovery blocker. About 10 minutes**
 

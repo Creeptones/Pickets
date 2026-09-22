@@ -205,7 +205,12 @@ selection and availability information. Controls have visible focus indicators, 
 high-contrast colors when enabled, and accommodate larger text with wrapping and scrolling.
 Welcome, About, and keyboard help also resize and scroll, use high-contrast colors, and keep their
 primary action visible on smaller screens. Start stays disabled until desktop readiness is confirmed.
-Animations respect the Windows animation preference. Automated UI Automation and rendering tests
+Animations respect the Windows animation preference. All pickets share a render-driven animation
+loop; dragging and resizing batch border and handle updates once per rendered frame. Animation
+duration stays consistent across refresh rates, and the loop detaches when idle. Actual frame rate
+depends on WPF, Windows, and the display workload; no specific monitor FPS is guaranteed.
+Diagnostic logs include callback timing after animated stack changes to help investigate stutter.
+Automated UI Automation and rendering tests
 cover this baseline; a hands-on Narrator and mixed-DPI focus pass remains part of the
 [release checklist](docs/RELEASE_CHECKLIST.md).
 

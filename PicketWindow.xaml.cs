@@ -11,7 +11,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Threading;
 
 namespace Pickets;
 
@@ -27,7 +26,6 @@ public partial class PicketWindow : Window
     private bool _isCollapsed;
     private double _expandedHeight;
     private bool _isRollAnimating;
-    private DispatcherTimer? _rollAnimationTimer;
     private string _colorKey = "porcelain";
     private string _transparencyKey = "solid";
     private int _transparencyCustomPercent = 50;
@@ -312,7 +310,7 @@ public partial class PicketWindow : Window
 
     private void RaiseLayoutChanged()
     {
-        if (_isLoading) return;
+        if (_isLoading || _isRollAnimating) return;
         LayoutChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -364,11 +362,6 @@ public partial class PicketWindow : Window
     private static GroupOrientation GetSimpleGroupOrientation(IReadOnlyCollection<PicketWindow> cluster)
         => ConnectedGroupLayout.Orientation(cluster.Select(p => new Rect(p.Left, p.Top, p.Width, p.Height)).ToList());
 
-    private static void ReflowCluster(List<PicketWindow> ordered, GroupOrientation orientation)
-    {
-        if (ordered.Count > 0) ApplyGroupBounds(ordered, ordered[0].Width, ordered[0]._expandedHeight);
-    }
-
     /// <summary>True when two pickets belong to the same drag group: they form a column (overlap
     /// horizontally, within GROUP_GAP vertically), a row (overlap vertically, within GROUP_GAP
     /// horizontally), or simply overlap. Pure diagonal-corner neighbors do NOT group.</summary>
@@ -408,21 +401,24 @@ public partial class PicketWindow : Window
     /// <summary>Updates the unlink button's visibility based on whether this picket touches any neighbor.
     /// Called by App after any picket in the system moves.</summary>
     public void RefreshLinkState()
+        => RefreshLinkState(ComputeTouchingCluster());
+
+    internal void RefreshLinkState(IReadOnlyList<PicketWindow> group)
     {
         if (UnlinkBtn == null) return;  // pre-XAML-init guard
-        UnlinkBtn.Visibility = HasTouchingNeighbor() ? Visibility.Visible : Visibility.Collapsed;
-        RefreshStackChrome();
-        RefreshResizeHandles();
+        UnlinkBtn.Visibility = group.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+        RefreshStackChrome(group);
+        RefreshResizeHandles(group);
     }
 
     /// <summary>Only expose resize handles on the outside of a connected group. Without this,
     /// the transparent bottom thumb of an upper picket can be dragged through the title of the
     /// picket below it, resizing several independent windows in place and making them overlap.</summary>
-    private void RefreshResizeHandles()
+    private void RefreshResizeHandles(IReadOnlyList<PicketWindow> group)
     {
         if (ResizeRight == null || ResizeBottom == null || ResizeBottomRight == null) return;
 
-        var cluster = ComputeTouchingCluster().Where(p => p.IsOnStackPage).ToList();
+        var cluster = group.Where(p => p.IsOnStackPage).ToList();
         if (cluster.Count == 0) return;
         var groupRight = cluster.Max(p => p.Left + p.Width);
         var groupBottom = cluster.Max(p => p.Top + p.Height);
@@ -437,11 +433,11 @@ public partial class PicketWindow : Window
 
     /// <summary>Makes a vertical run of separate native windows read as one continuous component.
     /// Only the outside of the group is rounded; internal top borders become consistent dividers.</summary>
-    private void RefreshStackChrome()
+    private void RefreshStackChrome(IReadOnlyList<PicketWindow> group)
     {
-        if (Application.Current is not App app || OuterShell == null || TitleShell == null) return;
+        if (OuterShell == null || TitleShell == null) return;
 
-        var aligned = app.Pickets.Where(other => other != this && other.IsOnStackPage && other.GroupId == GroupId && HorizontallyOverlaps(other, this));
+        var aligned = group.Where(other => other != this && other.IsOnStackPage && HorizontallyOverlaps(other, this));
         var hasAbove = aligned.Any(other => other.Top < Top &&
             Math.Abs(other.Top + other.Height - Top) <= GROUP_GAP);
         var hasBelow = aligned.Any(other => other.Top > Top &&
@@ -456,11 +452,6 @@ public partial class PicketWindow : Window
         TitleShell.CornerRadius = new CornerRadius(
             hasAbove ? 0 : 9, hasAbove ? 0 : 9,
             roundTitleBottom ? 9 : 0, roundTitleBottom ? 9 : 0);
-    }
-
-    private bool HasTouchingNeighbor()
-    {
-        return ComputeTouchingCluster().Count > 1;
     }
 
     private void TitleMenu_DeletePicket_Click(object sender, RoutedEventArgs e)
@@ -844,31 +835,20 @@ public partial class PicketWindow : Window
     private void Resize_DragCompleted(object sender, DragCompletedEventArgs e)
     {
         _resizeCluster = null;
-        if (Application.Current is App app)
-            foreach (var p in app.Pickets) p.RefreshLinkState();
+        RaiseLayoutChanged();
     }
 
-    private void ResizeClusterWidth(double requestedChange)
+    private void ResizeCluster(double horizontalChange, double verticalChange)
     {
         if (_resizeCluster == null || _resizeCluster.Count == 0) return;
-        var divisor = _resizeOrientation == GroupOrientation.Row ? Math.Max(1, _resizeCluster.Count(p => p.IsOnStackPage)) : 1;
-        var target = Math.Max(Width + requestedChange / divisor, _resizeCluster.Max(p => p.MinWidth));
-        foreach (var p in _resizeCluster) p.Width = target;
-        ReflowCluster(OrderResizeCluster(), _resizeOrientation);
-    }
-
-    private void ResizeClusterHeight(double requestedChange)
-    {
-        if (_resizeCluster == null || _resizeCluster.Count == 0) return;
-        var divisor = _resizeOrientation == GroupOrientation.Column
+        var widthDivisor = _resizeOrientation == GroupOrientation.Row
+            ? Math.Max(1, _resizeCluster.Count(p => p.IsOnStackPage)) : 1;
+        var heightDivisor = _resizeOrientation == GroupOrientation.Column
             ? Math.Max(1, _resizeCluster.Count(p => p.IsOnStackPage && !p._isCollapsed)) : 1;
-        var target = Math.Max(_expandedHeight + requestedChange / divisor, 96);
-        foreach (var p in _resizeCluster)
-        {
-            p._expandedHeight = target;
-            if (!p._isCollapsed) p.Height = target;
-        }
-        ReflowCluster(OrderResizeCluster(), _resizeOrientation);
+        var width = Math.Max(Width + horizontalChange / widthDivisor, _resizeCluster.Max(p => p.MinWidth));
+        var height = Math.Max(_expandedHeight + verticalChange / heightDivisor, 96);
+        foreach (var p in _resizeCluster) p._expandedHeight = height;
+        ApplyGroupBounds(OrderResizeCluster(), width, height);
     }
 
     private List<PicketWindow> OrderResizeCluster()
@@ -877,17 +857,16 @@ public partial class PicketWindow : Window
             : _resizeCluster.OrderBy(p => p.GroupOrder).ToList();
 
     private void ResizeRight_DragDelta(object sender, DragDeltaEventArgs e)
-        => ResizeClusterWidth(e.HorizontalChange);
+        => ResizeCluster(e.HorizontalChange, 0);
 
     private void ResizeBottom_DragDelta(object sender, DragDeltaEventArgs e)
     {
-        ResizeClusterHeight(e.VerticalChange);
+        ResizeCluster(0, e.VerticalChange);
     }
 
     private void ResizeBottomRight_DragDelta(object sender, DragDeltaEventArgs e)
     {
-        ResizeClusterWidth(e.HorizontalChange);
-        ResizeClusterHeight(e.VerticalChange);
+        ResizeCluster(e.HorizontalChange, e.VerticalChange);
     }
 
     // === Drag-drop into the picket body ===

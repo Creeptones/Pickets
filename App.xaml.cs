@@ -41,6 +41,7 @@ public partial class App : Application
     private DispatcherTimer? _rehideTimer;
 
     public IReadOnlyList<PicketWindow> Pickets => _pickets;
+    internal RenderFrameLoop Frames { get; } = new();
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -441,6 +442,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        Frames.Dispose();
         SystemParameters.StaticPropertyChanged -= MenuAccessibilityChanged;
         // A secondary instance set up none of the subsystems below and -- crucially -- must NOT
         // SaveLayout(), or it would persist its empty picket list over the real layout. Just release
@@ -486,6 +488,7 @@ public partial class App : Application
 
     internal void HidePickets(bool explain = false)
     {
+        foreach (var picket in _pickets) picket.SettleStack();
         PicketsHidden = true;
         foreach (var picket in _pickets) picket.Hide();
         if (explain) _tray?.ShowBalloon("Pickets is hidden",
@@ -507,8 +510,18 @@ public partial class App : Application
     private void MarkDirty()
     {
         _stateDirty = true;
-        // Any layout change can flip another picket's "touching neighbors" state, so refresh all.
-        foreach (var f in _pickets) f.RefreshLinkState();
+        // Dragging, resizing and reflow can raise dozens of events for one visible frame.
+        // Inspect the final geometry once, rather than all intermediate window bounds.
+        if (!IsShuttingDown) Frames.Request(RefreshPicketChrome);
+    }
+
+    private void RefreshPicketChrome()
+    {
+        foreach (var group in _pickets.GroupBy(p => p.GroupId))
+        {
+            var members = group.ToList();
+            foreach (var picket in members) picket.RefreshLinkState(members);
+        }
     }
 
     /// <summary>Applies a theme to every saved profile, every active Picket, and future Pickets.
@@ -578,7 +591,7 @@ public partial class App : Application
         picket.Show();
         if (PicketsHidden) picket.Hide();
         // Spawning a new picket may already overlap an existing one -- refresh everyone's link state.
-        foreach (var f in _pickets) f.RefreshLinkState();
+        Frames.Request(RefreshPicketChrome);
         return picket;
     }
 

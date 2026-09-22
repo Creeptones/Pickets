@@ -23,7 +23,7 @@ public partial class PicketWindow
     internal void CloseForLayoutChange()
     {
         _allowClose = true;
-        _finishRollAnimation?.Invoke();
+        SettleStack();
         Close();
     }
 }

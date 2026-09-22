@@ -6,7 +6,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Threading;
 
 namespace Pickets;
 
@@ -231,11 +230,18 @@ public partial class PicketWindow
         for (var i = 0; i < group.Count; i++)
             if (!states[i]) group[i].BodyScroll.Visibility = Visibility.Visible;
         var clock = Stopwatch.StartNew();
-        _rollAnimationTimer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(16) };
+        var frames = (Application.Current as App)?.Frames;
+        Action<TimeSpan>? render = null;
+        var finished = false;
+        var sampleCount = 0;
+        var firstSample = 0.0;
+        var lastSample = 0.0;
+        var longestGap = 0.0;
         void Finish()
         {
-            _rollAnimationTimer?.Stop();
-            _rollAnimationTimer = null;
+            if (finished) return;
+            finished = true;
+            if (render != null) frames?.RemoveAnimation(render);
             _finishRollAnimation = null;
             for (var i = 0; i < group.Count; i++)
             {
@@ -245,31 +251,48 @@ public partial class PicketWindow
                 p.Width = target[i].Width;
                 p.Height = target[i].Height;
                 p._isCollapsed = states[i];
-                p._isRollAnimating = false;
                 p.UpdateExpansionControls();
-                p.RaiseLayoutChanged();
+            }
+            // No intermediate position/size notifications: persist and refresh the final stack once.
+            foreach (var p in group) p._isRollAnimating = false;
+            RaiseLayoutChanged();
+            if (sampleCount > 1)
+            {
+                var meanGap = (lastSample - firstSample) / (sampleCount - 1);
+                // Callback cadence is diagnostic evidence, not a claim about presented monitor FPS.
+                Logger.Log($"Stack render timing: pickets={group.Count}, callbacks={sampleCount}, mean={meanGap:F2}ms, max={longestGap:F2}ms.");
             }
         }
         _finishRollAnimation = Finish;
-        // Hidden sections and reduced-motion users do not need a render timer.
-        if (!IsVisible || !SystemParameters.ClientAreaAnimation) { Finish(); return; }
-        _rollAnimationTimer.Tick += (_, _) =>
+        // Hidden sections and reduced-motion users do not need a rendering subscription.
+        if (!IsVisible || !SystemParameters.ClientAreaAnimation || frames == null) { Finish(); return; }
+        render = _ =>
         {
-            var progress = Math.Clamp(clock.Elapsed.TotalMilliseconds / RollAnimationDuration.TotalMilliseconds, 0, 1);
-            if (!SystemParameters.ClientAreaAnimation) progress = 1;
-            var eased = 1 - Math.Pow(1 - progress, 3);
-            for (var i = 0; i < group.Count; i++)
+            if (finished) return;
+            try
             {
-                var p = group[i];
-                p.Left = start[i].Left + (target[i].Left - start[i].Left) * eased;
-                p.Top = start[i].Top + (target[i].Top - start[i].Top) * eased;
-                p.Height = start[i].Height + (target[i].Height - start[i].Height) * eased;
-                var targetAngle = states[i] ? 0 : 90;
-                p.ChevronRotation.Angle = startAngles[i] + (targetAngle - startAngles[i]) * eased;
+                var elapsed = clock.Elapsed.TotalMilliseconds;
+                if (sampleCount == 0) firstSample = elapsed;
+                else longestGap = Math.Max(longestGap, elapsed - lastSample);
+                lastSample = elapsed;
+                sampleCount++;
+                var progress = Math.Clamp(elapsed / RollAnimationDuration.TotalMilliseconds, 0, 1);
+                if (!IsVisible || !SystemParameters.ClientAreaAnimation) progress = 1;
+                var eased = 1 - Math.Pow(1 - progress, 3);
+                for (var i = 0; i < group.Count; i++)
+                {
+                    var p = group[i];
+                    p.Left = start[i].Left + (target[i].Left - start[i].Left) * eased;
+                    p.Top = start[i].Top + (target[i].Top - start[i].Top) * eased;
+                    p.Height = start[i].Height + (target[i].Height - start[i].Height) * eased;
+                    var targetAngle = states[i] ? 0 : 90;
+                    p.ChevronRotation.Angle = startAngles[i] + (targetAngle - startAngles[i]) * eased;
+                }
+                if (progress >= 1) Finish();
             }
-            if (progress >= 1) Finish();
+            catch { Finish(); throw; }
         };
-        _rollAnimationTimer.Start();
+        frames.AddAnimation(render);
     }
 
     private void UpdateExpansionControls()

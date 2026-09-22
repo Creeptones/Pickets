@@ -34,6 +34,10 @@ Set the publication date when those checks pass and the release is published.
 
 ### Changed
 
+- Every picket's expand/collapse and accordion motion shares WPF's rendering cadence instead of
+  a fixed 16 ms timer. Stack borders and resize handles refresh once per frame across dragging,
+  resizing, and layout changes; corner resizing applies one layout pass. Rendering callbacks
+  detach while idle, and reduced-motion behavior is preserved.
 - One consistently sized vector chevron rotates with the stack's expand/collapse animation,
   respecting Windows reduced-motion preferences.
 - Simplified reference and stack terminology; advanced recovery actions are separated from everyday controls.
