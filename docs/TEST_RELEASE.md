@@ -30,6 +30,14 @@ Build: use `release/Pickets.exe` and `release/PicketsSetup.exe` from this checko
       drag a connected stack, and resize its outer corner.
       **Pass:** sections and arrows move together, seams stay flush, and the final size/order saves.
       Try the same with Windows animations disabled: expansion should finish immediately.
+- [ ] **Quick clicks.** Click the same title again before it finishes opening, then quickly switch
+      between accordion sections. Try Space on a focused title too.
+      **Pass:** the latest request wins, movement redirects without jumping, and seams stay attached.
+      Each click counts; a double-click toggles twice.
+- [ ] **Click or drag.** Click a title with a slight hand wobble. Then deliberately drag a stack
+      away and back to its starting point. Press Escape while holding a title before dragging.
+      **Pass:** a small wobble toggles without moving; a deliberate drag never toggles on release;
+      Escape cancels the pending click. Repeat at another display scaling if available.
 
 **Round 2 — the recovery blocker. About 10 minutes**
 

@@ -113,3 +113,14 @@ intermediate geometry change; corner resizing performs one reflow. The loop deta
 filtering, batched updates, cleanup, and WPF stack resizing. These are scheduling/behavior checks,
 not measurements of displayed FPS. The live motion test and diagnostic callback timings should
 be checked on the target displays before release.
+
+### Responsive title interactions (2026-09-22)
+
+Title clicks and keyboard expansion requests can redirect a running stack animation from the
+current bounds and chevron angles. Cancelled callbacks cannot overwrite the newer transition;
+accordion targets, flush seams, and the original stack anchor are retained. Title presses use
+Windows drag tolerance in screen coordinates adjusted for display scaling, with capture-loss and
+Escape cancellation. Both clicks of a double-click now count as separate toggles.
+115 tests passed, including deterministic mid-animation reversal/switching on real unshown WPF
+windows and gesture cases at 100%, 125%, 150%, and 200% scaling. Live mouse/capture, keyboard,
+and reduced-motion checks remain in the short test list.

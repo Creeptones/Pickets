@@ -314,34 +314,57 @@ public partial class PicketWindow : Window
         LayoutChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    // === Title bar drag + double-click to roll up ===
+    // === Title click / drag ===
+    private readonly TitleGesture _titleGesture = new();
+
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_isRollAnimating) { e.Handled = true; return; }
-        // The first click already toggles on release. Ignore the second half of a double-click so
-        // the fence does not immediately toggle back to its starting state.
-        if (e.ClickCount > 1) { e.Handled = true; return; }
-        if (e.ClickCount == 1 && e.LeftButton == MouseButtonState.Pressed)
-        {
-            TitleToggle.Focus();
-            ClearSelection();
-            var startLeft = Left;
-            var startTop = Top;
-            BeginGroupDrag();
-            try { DragMove(); }                   // blocks until the user releases
-            finally
-            {
-                _dragCluster = null;
-                if (Math.Abs(Left - startLeft) >= 2 || Math.Abs(Top - startTop) >= 2) JoinTouchingGroups();
-                else NormalizeConnectedGroup();
-            }
+        if (e.LeftButton != MouseButtonState.Pressed) return;
+        TitleToggle.Focus();
+        ClearSelection();
+        _titleGesture.Begin(PointToScreen(e.GetPosition(this)), VisualTreeHelper.GetDpi(this),
+            SystemParameters.MinimumHorizontalDragDistance, SystemParameters.MinimumVerticalDragDistance);
+        if (!TitleShell.CaptureMouse()) _titleGesture.Cancel();
+        e.Handled = true;
+    }
 
-            // A title is both the drag handle and the accordion trigger. Treat a release without
-            // meaningful movement as a click; actual drags retain the existing group-move behavior.
-            if (Math.Abs(Left - startLeft) < 2 && Math.Abs(Top - startTop) < 2)
-                ToggleCollapse();
-            e.Handled = true;
+    private void TitleBar_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_titleGesture.IsPending) return;
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            CancelTitleGesture();
+            return;
         }
+        if (!_titleGesture.Move(PointToScreen(e.GetPosition(this)))) return;
+        TitleShell.ReleaseMouseCapture();
+        // Only a deliberate drag settles the animation. A click can redirect it without a jump.
+        SettleStack();
+        BeginGroupDrag();
+        try { DragMove(); }
+        finally
+        {
+            _dragCluster = null;
+            JoinTouchingGroups();
+        }
+        e.Handled = true;
+    }
+
+    private void TitleBar_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_titleGesture.IsPending) return;
+        var click = _titleGesture.Release(PointToScreen(e.GetPosition(this)));
+        TitleShell.ReleaseMouseCapture();
+        if (click) ToggleCollapse();
+        e.Handled = true;
+    }
+
+    private void TitleBar_LostMouseCapture(object sender, MouseEventArgs e) => _titleGesture.Cancel();
+
+    private void CancelTitleGesture()
+    {
+        _titleGesture.Cancel();
+        if (TitleShell.IsMouseCaptured) TitleShell.ReleaseMouseCapture();
     }
 
     private void BeginGroupDrag()
@@ -759,20 +782,20 @@ public partial class PicketWindow : Window
 
     private void ToggleCollapse()
     {
-        if (_isRollAnimating) return;
-        NormalizeConnectedGroup();
-        ApplyCollapseState(!_isCollapsed, animate: true);
+        SetExpanded(IntendedCollapsed);
     }
 
     private void ApplyCollapseState(bool collapsed, bool animate = false)
     {
-        if (collapsed == _isCollapsed || _isRollAnimating) return;
+        if (collapsed == IntendedCollapsed) return;
 
         if (animate)
         {
             AnimateCollapseState(collapsed);
             return;
         }
+
+        SettleStack();
 
         if (collapsed)
         {

@@ -153,6 +153,9 @@ change saved order; the first page is shown after restart. Paged stacks change i
 Creating a picket from a title menu or with **Ctrl+N** inserts it directly after that picket in the
 same stack. Deleting a section closes the gap automatically and preserves the stack's position.
 Click a title or focus it and press **Space** to expand or collapse; the title menu omits this action.
+Clicks during expansion redirect the whole stack from its current position, including the chevrons.
+Each click toggles once, so a double-click toggles twice. Slight mouse movement remains a click;
+dragging begins after the Windows drag tolerance is crossed. Escape cancels a pending title press.
 
 ### File references, not file operations
 

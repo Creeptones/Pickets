@@ -66,6 +66,12 @@ public partial class PicketWindow
         var ctrl = mods.HasFlag(ModifierKeys.Control);
         var shift = mods.HasFlag(ModifierKeys.Shift);
         var alt = mods.HasFlag(ModifierKeys.Alt);
+        if (key == Key.Escape && _titleGesture.IsPending)
+        {
+            CancelTitleGesture();
+            e.Handled = true;
+            return;
+        }
         if (key == Key.F1) ShowKeyboardHelp();
         else if (ctrl && key is Key.PageUp or Key.PageDown) ChangeStackPage(key == Key.PageUp ? -1 : 1);
         else if (key == Key.Tab && ctrl && Application.Current is App app) app.FocusNextPicket(this, shift ? -1 : 1);

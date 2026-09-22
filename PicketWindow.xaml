@@ -171,6 +171,9 @@
                         Height="30"
                         CornerRadius="10,10,0,0"
                         MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
+                        MouseMove="TitleBar_MouseMove"
+                        MouseLeftButtonUp="TitleBar_MouseLeftButtonUp"
+                        LostMouseCapture="TitleBar_LostMouseCapture"
                         ContextMenu="{StaticResource TitleContextMenu}"
                         ContextMenuOpening="TitleBar_ContextMenuOpening">
                     <Grid>

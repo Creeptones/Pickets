@@ -16,6 +16,10 @@ public partial class PicketWindow
     private bool _groupHorizontal;
     private bool _accordionMode;
     private Action? _finishRollAnimation;
+    private Action? _cancelRollAnimation;
+    private bool? _rollTargetCollapsed;
+    private Point? _rollAnchor;
+    private bool IntendedCollapsed => _rollTargetCollapsed ?? _isCollapsed;
     internal bool NeedsGroupMigration { get; private set; }
     private int _stackPageIndex;
     private int _stackPageCount = 1;
@@ -83,7 +87,7 @@ public partial class PicketWindow
     internal List<PicketWindow> SettleStack()
     {
         var group = ComputeTouchingCluster();
-        // The timer belongs to the section that initiated expansion, which need not be the
+        // The animation belongs to the section that initiated expansion, which need not be the
         // section being added to or removed. Finish it before changing membership or bounds.
         foreach (var member in group) member._finishRollAnimation?.Invoke();
         return group;
@@ -210,39 +214,93 @@ public partial class PicketWindow
 
     private void AnimateStack(bool collapsed)
     {
+        var update = CreateStackAnimation(collapsed);
+        if (update == null) return;
+        var finish = _finishRollAnimation!;
+        var cancel = _cancelRollAnimation!;
+        var frames = (Application.Current as App)?.Frames;
+        if (!IsVisible || !SystemParameters.ClientAreaAnimation || frames == null) { finish(); return; }
+        var clock = Stopwatch.StartNew();
+        var sampleCount = 0;
+        var firstSample = 0.0;
+        var lastSample = 0.0;
+        var longestGap = 0.0;
+        Action<TimeSpan> render = _ =>
+        {
+            try
+            {
+                var elapsed = clock.Elapsed.TotalMilliseconds;
+                if (sampleCount == 0) firstSample = elapsed;
+                else longestGap = Math.Max(longestGap, elapsed - lastSample);
+                lastSample = elapsed;
+                sampleCount++;
+                var progress = Math.Clamp(elapsed / RollAnimationDuration.TotalMilliseconds, 0, 1);
+                if (!IsVisible || !SystemParameters.ClientAreaAnimation) progress = 1;
+                update(progress);
+            }
+            catch { _finishRollAnimation?.Invoke(); throw; }
+        };
+        _cancelRollAnimation = () => { frames.RemoveAnimation(render); cancel(); };
+        _finishRollAnimation = () =>
+        {
+            frames.RemoveAnimation(render);
+            finish();
+            if (sampleCount > 1)
+            {
+                var meanGap = (lastSample - firstSample) / (sampleCount - 1);
+                // Callback cadence is diagnostic evidence, not presented monitor FPS.
+                Logger.Log($"Stack render timing: pickets={ComputeTouchingCluster().Count}, callbacks={sampleCount}, mean={meanGap:F2}ms, max={longestGap:F2}ms.");
+            }
+        };
+        frames.AddAnimation(render);
+    }
+
+    // Prepare independently of the render clock so retargeting always starts at the current
+    // geometry. The returned sampler is inert after cancellation, even if a frame was queued.
+    private Action<double>? CreateStackAnimation(bool collapsed)
+    {
         var group = ComputeTouchingCluster();
-        if (group.Any(p => p._isRollAnimating)) return;
-        var states = StackLayout.CollapseStates(group.Select(p => p._isCollapsed).ToArray(),
+        var anchor = group[0]._rollAnchor ?? new Point(group[0].Left, group[0].Top);
+        var states = StackLayout.CollapseStates(group.Select(p => p.IntendedCollapsed).ToArray(),
             group.IndexOf(this), collapsed, _accordionMode);
+        foreach (var p in group) p._cancelRollAnimation?.Invoke();
         if (GetStackPage(group).Count > 1)
         {
             for (var i = 0; i < group.Count; i++) group[i]._isCollapsed = states[i];
             NormalizeConnectedGroup();
-            return;
+            return null;
         }
         var start = group.Select(p => new Rect(p.Left, p.Top, p.Width, p.Height)).ToArray();
         var startAngles = group.Select(p => p.ChevronRotation.Angle).ToArray();
         var first = group[0];
         var dpi = VisualTreeHelper.GetDpi(first);
-        var target = StackLayout.Arrange(new Point(first.Left, first.Top), first.Width, first._expandedHeight,
+        var target = StackLayout.Arrange(anchor, first.Width, first._expandedHeight,
             states, _groupHorizontal, first.GroupWorkArea(), dpi.DpiScaleX, dpi.DpiScaleY);
-        foreach (var p in group) p._isRollAnimating = true;
         for (var i = 0; i < group.Count; i++)
+        {
+            group[i]._isRollAnimating = true;
+            group[i]._rollTargetCollapsed = states[i];
+            group[i]._rollAnchor = anchor;
+            group[i].TitleToggle.IsExpanded = !states[i];
+            group[i].TitleToggle.ToolTip = states[i] ? "Expand picket; drag to move stack" : "Collapse picket; drag to move stack";
             if (!states[i]) group[i].BodyScroll.Visibility = Visibility.Visible;
-        var clock = Stopwatch.StartNew();
-        var frames = (Application.Current as App)?.Frames;
-        Action<TimeSpan>? render = null;
+        }
         var finished = false;
-        var sampleCount = 0;
-        var firstSample = 0.0;
-        var lastSample = 0.0;
-        var longestGap = 0.0;
-        void Finish()
+        void Cancel()
         {
             if (finished) return;
             finished = true;
-            if (render != null) frames?.RemoveAnimation(render);
-            _finishRollAnimation = null;
+            _finishRollAnimation = _cancelRollAnimation = null;
+            foreach (var p in group)
+            {
+                p._isRollAnimating = false;
+                p._rollTargetCollapsed = null;
+                p._rollAnchor = null;
+            }
+        }
+        void Finish()
+        {
+            if (finished) return;
             for (var i = 0; i < group.Count; i++)
             {
                 var p = group[i];
@@ -254,45 +312,27 @@ public partial class PicketWindow
                 p.UpdateExpansionControls();
             }
             // No intermediate position/size notifications: persist and refresh the final stack once.
-            foreach (var p in group) p._isRollAnimating = false;
+            Cancel();
             RaiseLayoutChanged();
-            if (sampleCount > 1)
-            {
-                var meanGap = (lastSample - firstSample) / (sampleCount - 1);
-                // Callback cadence is diagnostic evidence, not a claim about presented monitor FPS.
-                Logger.Log($"Stack render timing: pickets={group.Count}, callbacks={sampleCount}, mean={meanGap:F2}ms, max={longestGap:F2}ms.");
-            }
         }
         _finishRollAnimation = Finish;
-        // Hidden sections and reduced-motion users do not need a rendering subscription.
-        if (!IsVisible || !SystemParameters.ClientAreaAnimation || frames == null) { Finish(); return; }
-        render = _ =>
+        _cancelRollAnimation = Cancel;
+        return progress =>
         {
             if (finished) return;
-            try
+            progress = Math.Clamp(progress, 0, 1);
+            var eased = 1 - Math.Pow(1 - progress, 3);
+            for (var i = 0; i < group.Count; i++)
             {
-                var elapsed = clock.Elapsed.TotalMilliseconds;
-                if (sampleCount == 0) firstSample = elapsed;
-                else longestGap = Math.Max(longestGap, elapsed - lastSample);
-                lastSample = elapsed;
-                sampleCount++;
-                var progress = Math.Clamp(elapsed / RollAnimationDuration.TotalMilliseconds, 0, 1);
-                if (!IsVisible || !SystemParameters.ClientAreaAnimation) progress = 1;
-                var eased = 1 - Math.Pow(1 - progress, 3);
-                for (var i = 0; i < group.Count; i++)
-                {
-                    var p = group[i];
-                    p.Left = start[i].Left + (target[i].Left - start[i].Left) * eased;
-                    p.Top = start[i].Top + (target[i].Top - start[i].Top) * eased;
-                    p.Height = start[i].Height + (target[i].Height - start[i].Height) * eased;
-                    var targetAngle = states[i] ? 0 : 90;
-                    p.ChevronRotation.Angle = startAngles[i] + (targetAngle - startAngles[i]) * eased;
-                }
-                if (progress >= 1) Finish();
+                var p = group[i];
+                p.Left = start[i].Left + (target[i].Left - start[i].Left) * eased;
+                p.Top = start[i].Top + (target[i].Top - start[i].Top) * eased;
+                p.Height = start[i].Height + (target[i].Height - start[i].Height) * eased;
+                var targetAngle = states[i] ? 0 : 90;
+                p.ChevronRotation.Angle = startAngles[i] + (targetAngle - startAngles[i]) * eased;
             }
-            catch { Finish(); throw; }
+            if (progress >= 1) _finishRollAnimation?.Invoke();
         };
-        frames.AddAnimation(render);
     }
 
     private void UpdateExpansionControls()
@@ -306,8 +346,8 @@ public partial class PicketWindow
     internal void SetExpanded(bool expanded)
     {
         if (expanded) RevealOnStackPage();
-        if (_isCollapsed == !expanded || _isRollAnimating) return;
-        NormalizeConnectedGroup();
+        if (IntendedCollapsed == !expanded) return;
+        if (!_isRollAnimating) NormalizeConnectedGroup();
         AnimateStack(!expanded);
     }
 

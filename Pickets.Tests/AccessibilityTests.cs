@@ -126,6 +126,7 @@ public sealed class AccessibilityTests
             }
             finally { directory.Delete(true); }
             CheckStackMembershipChanges(app, windows);
+            CheckStackRetargeting(app, windows);
             CheckReleasePolish(app, windows);
         }
         finally
@@ -134,6 +135,95 @@ public sealed class AccessibilityTests
             app.Frames.Dispose();
             // Do not call App.Shutdown: normal OnExit persists the user's real layout.
             Dispatcher.CurrentDispatcher.InvokeShutdown();
+        }
+    }
+
+    private static void CheckStackRetargeting(App app, List<PicketWindow> windows)
+    {
+        var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var prepare = typeof(PicketWindow).GetMethod("CreateStackAnimation", flags)!;
+        var active = typeof(PicketWindow).GetField("_isRollAnimating", flags)!;
+        foreach (var horizontal in new[] { false, true })
+        foreach (var accordion in horizontal ? new[] { false } : new[] { false, true })
+        {
+            var members = new List<PicketWindow>();
+            for (var i = 0; i < 3; i++)
+            {
+                var member = new PicketWindow(new PicketState
+                {
+                    Title = "Retarget " + i, GroupId = "retarget", GroupOrder = i,
+                    GroupHorizontal = horizontal, AccordionMode = accordion,
+                    IsCollapsed = i != 0, Width = 200, Height = 160, X = 30, Y = 30 + i * 32
+                });
+                members.Add(member);
+                windows.Add(member);
+                ((IList<PicketWindow>)app.Pickets).Add(member);
+            }
+            members[0].NormalizeConnectedGroup();
+            var original = Bounds();
+            var closing = Begin(0, true);
+            closing(0.35);
+            CheckSeams();
+            var midway = Bounds();
+            var midwayAngles = Angles();
+            var reversing = Begin(0, false);
+            Assert.Equal(midway, Bounds());
+            reversing(0);
+            Assert.Equal(midway, Bounds());
+            Assert.Equal(midwayAngles, Angles());
+            closing(1); // A cancelled callback cannot finish over the newer transition.
+            Assert.Equal(midway, Bounds());
+            reversing(0.5);
+            CheckSeams();
+            reversing(1);
+            Assert.Equal(original, Bounds());
+            Assert.False(members[0].ToState().IsCollapsed);
+
+            var openSecond = Begin(1, false);
+            openSecond(0.3);
+            var beforeSwitch = Bounds();
+            var openThird = Begin(2, false);
+            openThird(0);
+            Assert.Equal(beforeSwitch, Bounds());
+            openSecond(1);
+            Assert.Equal(beforeSwitch, Bounds());
+            openThird(0.6);
+            CheckSeams();
+            openThird(1);
+            Assert.False(members[2].ToState().IsCollapsed);
+            Assert.Equal(accordion, members[0].ToState().IsCollapsed);
+            Assert.Equal(accordion, members[1].ToState().IsCollapsed);
+            Assert.All(members, p => Assert.False((bool)active.GetValue(p)!));
+
+            // Keyboard/automation requests must reverse the intended state too. Hidden windows
+            // finish immediately, exercising the no-animation path used by reduced motion.
+            var pending = Begin(2, true);
+            pending(0.4);
+            members[2].SetExpanded(true);
+            Assert.False(members[2].ToState().IsCollapsed);
+            pending(1);
+            Assert.False(members[2].ToState().IsCollapsed);
+            var last = Begin(0, false);
+            last(0.2);
+            members[1].SettleStack(); // Settle through a member that does not own the animation.
+            Assert.All(members, p => Assert.False((bool)active.GetValue(p)!));
+            CheckSeams();
+            foreach (var member in members)
+            {
+                app.DeletePicket(member);
+                windows.Remove(member);
+            }
+
+            Action<double> Begin(int index, bool collapsed)
+                => (Action<double>)prepare.Invoke(members[index], [collapsed])!;
+            Rect[] Bounds() => members.Select(p => new Rect(p.Left, p.Top, p.Width, p.Height)).ToArray();
+            double[] Angles() => members.Select(p => ((RotateTransform)p.FindName("ChevronRotation")).Angle).ToArray();
+            void CheckSeams()
+            {
+                for (var i = 1; i < members.Count; i++)
+                    Assert.Equal(horizontal ? members[i - 1].Left + members[i - 1].Width : members[i - 1].Top + members[i - 1].Height,
+                        horizontal ? members[i].Left : members[i].Top, 6);
+            }
         }
     }
 

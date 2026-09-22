@@ -34,6 +34,11 @@ Set the publication date when those checks pass and the release is published.
 
 ### Changed
 
+- Title clicks and keyboard expansion requests redirect an in-progress stack animation from
+  its current geometry; rapid clicks are no longer discarded. Each title click toggles once,
+  including both clicks of a double-click.
+- Title dragging starts after Windows' drag tolerance is crossed, scaled for the current display.
+  Small pointer jitter remains a click; dragging back to the starting point does not collapse a picket.
 - Every picket's expand/collapse and accordion motion shares WPF's rendering cadence instead of
   a fixed 16 ms timer. Stack borders and resize handles refresh once per frame across dragging,
   resizing, and layout changes; corner resizing applies one layout pass. Rendering callbacks
