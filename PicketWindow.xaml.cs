@@ -37,11 +37,11 @@ public partial class PicketWindow : Window
     // Group-drag: when the user grabs this picket's title, every picket whose edges currently touch
     // ours (transitively) tags along, so a snapped row/column moves as one.
     private List<PicketWindow>? _dragCluster;
-    private double _dragLastLeft, _dragLastTop;
 
-    // Snap unstick: capture screen rect at drag-start so TrySnap can disable per-axis snapping
-    // once the user has pulled past UNSTICK_PIXELS on that axis. Lets diagonals flow.
+    // Screen rect at drag-start. Until an axis has travelled past SNAP_PIXELS, the alignment the
+    // picket started at does not attract it, so the first pixels of a drag are never swallowed.
     private RECT _dragStartScreenRect;
+    private bool _dragLeftStartX, _dragLeftStartY;
 
     // Starts true: the menu's Slider parses with Value="50" inside InitializeComponent and fires
     // ValueChanged before our fields/named elements exist. Constructor flips this off at the end.
@@ -186,7 +186,6 @@ public partial class PicketWindow : Window
     // Snapping happens during WM_MOVING (the system asks us to validate the proposed RECT in physical
     // screen coords). Mutating the RECT here avoids any visible jitter and is naturally DPI-correct.
     private const int SNAP_PIXELS    = 8;
-    private const int UNSTICK_PIXELS = 12;  // per-axis travel before that axis stops attracting
 
     private IntPtr WndProcSnap(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
@@ -194,8 +193,43 @@ public partial class PicketWindow : Window
         var rect = Marshal.PtrToStructure<RECT>(lParam);
         if (TrySnap(hwnd, ref rect))
             Marshal.StructureToPtr(rect, lParam, false);
+        // Move followers now, to the leader's final (snapped) position, so the whole group lands
+        // in the same frame rather than trailing the leader by one move notification.
+        if (_dragCluster != null && WindowInterop.GetWindowRect(hwnd, out var current))
+            OffsetWindows(_dragCluster.Where(p => p != this), rect.left - current.left, rect.top - current.top);
         handled = true;
         return new IntPtr(1);
+    }
+
+    /// <summary>Moves windows by a physical-pixel offset in one batched native call. Assigning
+    /// Left then Top per window moved each follower twice (a visible stair-step) and repainted
+    /// the desktop behind it once per assignment.</summary>
+    private static void OffsetWindows(IEnumerable<PicketWindow> windows, int dx, int dy)
+    {
+        if (dx == 0 && dy == 0) return;
+        var targets = new List<(IntPtr Handle, POINT Position)>();
+        foreach (var window in windows)
+        {
+            var h = new WindowInteropHelper(window).Handle;
+            if (h == IntPtr.Zero || !WindowInterop.GetWindowRect(h, out var r)) continue;
+            // SetWindowPos takes parent-client coordinates, and pickets are children of Explorer's WorkerW.
+            var position = new POINT(r.left + dx, r.top + dy);
+            // Its return is the applied offset, which is legitimately zero when WorkerW sits at the origin.
+            _ = WindowInterop.MapWindowPoints(IntPtr.Zero, WindowInterop.GetAncestor(h, WindowInterop.GA_PARENT), ref position, 1);
+            targets.Add((h, position));
+        }
+        if (targets.Count == 0) return;
+
+        const uint flags = WindowInterop.SWP_NOSIZE | WindowInterop.SWP_NOZORDER |
+            WindowInterop.SWP_NOACTIVATE | WindowInterop.SWP_NOOWNERZORDER;
+        var batch = WindowInterop.BeginDeferWindowPos(targets.Count);
+        foreach (var (h, position) in targets)
+            if (batch != IntPtr.Zero)
+                batch = WindowInterop.DeferWindowPos(batch, h, IntPtr.Zero, position.X, position.Y, 0, 0, flags);
+        if (batch != IntPtr.Zero && WindowInterop.EndDeferWindowPos(batch)) return;
+        // A batch requires one shared parent. Targets are absolute, so repeating them is safe.
+        foreach (var (h, position) in targets)
+            WindowInterop.SetWindowPos(h, IntPtr.Zero, position.X, position.Y, 0, 0, flags);
     }
 
     private bool TrySnap(IntPtr selfHwnd, ref RECT r)
@@ -209,21 +243,27 @@ public partial class PicketWindow : Window
         int left = r.left, top = r.top;
         int width = r.right - r.left, height = r.bottom - r.top;
 
-        // Once the user has pulled the window more than UNSTICK_PIXELS on a given axis from where the
-        // drag started, stop attracting on that axis. Initial millimeters still snap (so brushing past
-        // an edge feels magnetic), but committed diagonal movement isn't yanked back to a neighbor.
-        bool snapXAllowed = Math.Abs(left - _dragStartScreenRect.left) <= UNSTICK_PIXELS;
-        bool snapYAllowed = Math.Abs(top  - _dragStartScreenRect.top)  <= UNSTICK_PIXELS;
+        // A picket usually rests flush against an edge or a neighbor. If that resting alignment
+        // attracted it along the direction of travel, the first SNAP_PIXELS would do nothing and
+        // the window would then jump: the "sticky" start. So the resting alignment only holds an
+        // axis the user is clearly not moving along (a rail for a straight slide), and once an axis
+        // has left it, every edge, including the original one, attracts normally.
+        var travelX = Math.Abs(left - _dragStartScreenRect.left);
+        var travelY = Math.Abs(top  - _dragStartScreenRect.top);
+        if (travelX > SNAP_PIXELS) _dragLeftStartX = true;
+        if (travelY > SNAP_PIXELS) _dragLeftStartY = true;
+        var ignoreStartX = !_dragLeftStartX && 2 * travelX > travelY;
+        var ignoreStartY = !_dragLeftStartY && 2 * travelY > travelX;
 
         void TryX(int candidateLeft)
         {
-            if (!snapXAllowed) return;
+            if (ignoreStartX && Math.Abs(candidateLeft - _dragStartScreenRect.left) <= SNAP_PIXELS) return;
             var d = candidateLeft - left;
             if (Math.Abs(d) < Math.Abs(bestDx)) bestDx = d;
         }
         void TryY(int candidateTop)
         {
-            if (!snapYAllowed) return;
+            if (ignoreStartY && Math.Abs(candidateTop - _dragStartScreenRect.top) <= SNAP_PIXELS) return;
             var d = candidateTop - top;
             if (Math.Abs(d) < Math.Abs(bestDy)) bestDy = d;
         }
@@ -295,26 +335,7 @@ public partial class PicketWindow : Window
     protected override void OnLocationChanged(EventArgs e)
     {
         base.OnLocationChanged(e);
-
-        // If we're the leader of a group drag, translate every other cluster member by our delta.
-        // Followers don't have _dragCluster set, so they just no-op past this and raise normally.
-        if (_dragCluster != null)
-        {
-            var dx = Left - _dragLastLeft;
-            var dy = Top - _dragLastTop;
-            _dragLastLeft = Left;
-            _dragLastTop = Top;
-            if (dx != 0 || dy != 0)
-            {
-                foreach (var member in _dragCluster)
-                {
-                    if (member == this) continue;
-                    member.Left += dx;
-                    member.Top  += dy;
-                }
-            }
-        }
-
+        // Group-drag followers are moved natively in WndProcSnap; WPF reports their new bounds here.
         RaiseLayoutChanged();
     }
 
@@ -333,13 +354,15 @@ public partial class PicketWindow : Window
 
     // === Title click / drag ===
     private readonly TitleGesture _titleGesture = new();
+    private Point _titlePressScreen;
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.LeftButton != MouseButtonState.Pressed) return;
         TitleToggle.Focus();
         ClearSelection();
-        _titleGesture.Begin(PointToScreen(e.GetPosition(this)), VisualTreeHelper.GetDpi(this),
+        _titlePressScreen = PointToScreen(e.GetPosition(this));
+        _titleGesture.Begin(_titlePressScreen, VisualTreeHelper.GetDpi(this),
             SystemParameters.MinimumHorizontalDragDistance, SystemParameters.MinimumVerticalDragDistance);
         if (!TitleShell.CaptureMouse()) _titleGesture.Cancel();
         e.Handled = true;
@@ -357,11 +380,17 @@ public partial class PicketWindow : Window
         TitleShell.ReleaseMouseCapture();
         // Only a deliberate drag settles the animation. A click can redirect it without a jump.
         SettleStack();
-        BeginGroupDrag();
-        try { DragMove(); }
+        var app = Application.Current as App;
+        app?.BeginInteractiveMove();
+        try
+        {
+            BeginGroupDrag();
+            DragMove();
+        }
         finally
         {
             _dragCluster = null;
+            app?.EndInteractiveMove();
             JoinTouchingGroups();
         }
         e.Handled = true;
@@ -386,10 +415,16 @@ public partial class PicketWindow : Window
 
     private void BeginGroupDrag()
     {
-        _dragLastLeft = Left;
-        _dragLastTop  = Top;
-        _dragCluster  = ComputeTouchingCluster();
+        _dragCluster = ComputeTouchingCluster();
         WindowInterop.GetWindowRect(new WindowInteropHelper(this).Handle, out _dragStartScreenRect);
+        _dragLeftStartX = _dragLeftStartY = false;
+
+        // The system move loop anchors to wherever the cursor is when it starts, which is already
+        // past the click-versus-drag threshold. Catch the group up first, or the picket stays that
+        // far behind the cursor and appears not to move for the first few pixels.
+        if (WindowInterop.GetCursorPos(out var cursor))
+            OffsetWindows(_dragCluster, (int)Math.Round(cursor.X - _titlePressScreen.X),
+                (int)Math.Round(cursor.Y - _titlePressScreen.Y));
     }
 
 
@@ -898,10 +933,12 @@ public partial class PicketWindow : Window
         NormalizeConnectedGroup();
         _resizeCluster = ComputeTouchingCluster();
         _resizeOrientation = _groupHorizontal ? GroupOrientation.Row : GroupOrientation.Column;
+        (Application.Current as App)?.BeginInteractiveMove();
     }
 
     private void Resize_DragCompleted(object sender, DragCompletedEventArgs e)
     {
+        if (_resizeCluster != null) (Application.Current as App)?.EndInteractiveMove();
         _resizeCluster = null;
         RaiseLayoutChanged();
         QueueContentSizing();

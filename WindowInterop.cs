@@ -52,6 +52,22 @@ internal static class WindowInterop
     public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
         int X, int Y, int cx, int cy, uint uFlags);
 
+    [DllImport("user32.dll")]
+    public static extern IntPtr BeginDeferWindowPos(int nNumWindows);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr DeferWindowPos(IntPtr hWinPosInfo, IntPtr hWnd, IntPtr hWndInsertAfter,
+        int x, int y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll")]
+    public static extern bool EndDeferWindowPos(IntPtr hWinPosInfo);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+
+    [DllImport("user32.dll")]
+    public static extern int MapWindowPoints(IntPtr hWndFrom, IntPtr hWndTo, ref POINT lpPoints, uint cPoints);
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
 
@@ -128,7 +144,10 @@ internal static class WindowInterop
     public static readonly IntPtr HWND_TOP = IntPtr.Zero;
     public const uint SWP_NOSIZE     = 0x0001;
     public const uint SWP_NOMOVE     = 0x0002;
+    public const uint SWP_NOZORDER   = 0x0004;
     public const uint SWP_NOACTIVATE = 0x0010;
+    public const uint SWP_NOOWNERZORDER = 0x0200;
+    public const uint GA_PARENT      = 1;
 
     public const int WH_MOUSE_LL    = 14;
     public const int SM_CXDOUBLECLK = 36;

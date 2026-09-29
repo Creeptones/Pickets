@@ -118,7 +118,9 @@ public partial class App : Application
         _saveDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _saveDebounce.Tick += (_, _) =>
         {
-            if (!_stateDirty) return;
+            // A save flushes to disk on the UI thread. Mid-drag that is a visible hitch; the
+            // dirty flag survives, so the first tick after the gesture persists the final bounds.
+            if (!_stateDirty || IsInteractiveMove) return;
             _stateDirty = false;
             SaveLayout();
         };
@@ -128,7 +130,9 @@ public partial class App : Application
         // desktop view (no reposition, no repaint, no effect on the user's selection); it only acts
         // when Explorer has clamped a hidden icon back on-screen.
         _rehideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000) };
-        _rehideTimer.Tick += (_, _) => RehideDriftedIcons();
+        // Each check is a burst of cross-process calls into Explorer, which also hosts the pickets'
+        // parent window. Skip it while a picket is being dragged or resized.
+        _rehideTimer.Tick += (_, _) => { if (!IsInteractiveMove) RehideDriftedIcons(); };
         _rehideTimer.Start();
 
         InstallDisplayChangeWatcher();
@@ -510,6 +514,16 @@ public partial class App : Application
         if (_pickets.Any(f => f.IsVisible)) HidePickets();
         else ShowPickets();
     }
+
+    private int _interactiveMoves;
+
+    /// <summary>True while a picket drag or resize is in progress. Periodic background work defers
+    /// until the gesture ends so it cannot stall the window move loop.</summary>
+    internal bool IsInteractiveMove => _interactiveMoves > 0;
+
+    internal void BeginInteractiveMove() => _interactiveMoves++;
+
+    internal void EndInteractiveMove() => _interactiveMoves = Math.Max(0, _interactiveMoves - 1);
 
     private void MarkDirty()
     {
