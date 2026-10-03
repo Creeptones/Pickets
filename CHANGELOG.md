@@ -5,6 +5,18 @@ All notable changes to Pickets are documented here. Versions follow
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-02
+
+### Fixed
+
+- Dragging a picket is responsive instead of sticky. Snapping no longer holds a picket at its
+  starting alignment for the first few pixels and then jumps; straight slides still stay on their
+  rail, and snapping now applies for the whole drag.
+- Layout saving and the desktop-icon re-hide scan pause while a picket is being dragged or resized;
+  the final position is saved when the drag ends.
+- Connected pickets move together in one batched window update at the leader's final position,
+  and the group catches up to the cursor at drag start instead of trailing behind it.
+
 ## [1.0.0] - 2026-09-22
 
 ### Release highlights
@@ -117,5 +129,6 @@ All notable changes to Pickets are documented here. Versions follow
 - Connected pickets now keep a single shared size, resize together from the group's outside
   boundary, and automatically close small gaps left by older layouts.
 
-[Unreleased]: https://github.com/Creeptones/Pickets/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Creeptones/Pickets/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Creeptones/Pickets/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Creeptones/Pickets/releases/tag/v1.0.0

@@ -22,9 +22,9 @@
     <Company>Creeptone</Company>
     <Description>Lightweight desktop-icon organizer for Windows 10 and 11 — sort desktop shortcuts into movable, translucent pickets.</Description>
     <Copyright>Copyright (c) 2026 Creeptone</Copyright>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.0.1</Version>
+    <AssemblyVersion>1.0.1.0</AssemblyVersion>
+    <FileVersion>1.0.1.0</FileVersion>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/Creeptones/Pickets</RepositoryUrl>
   </PropertyGroup>

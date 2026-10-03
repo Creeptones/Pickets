@@ -2,7 +2,7 @@
 ; The installer intentionally requires no elevation and makes every persistent choice visible.
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.0.0"
+  #define MyAppVersion "1.0.1"
 #endif
 
 #define MyAppName "Pickets"
