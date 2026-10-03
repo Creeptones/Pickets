@@ -5,6 +5,14 @@ All notable changes to Pickets are documented here. Versions follow
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-02
+
+### Changed
+
+- The installer's notes page now opens by explaining that Pickets never moves your files. Captured
+  icons are only hidden from the desktop and shown in a picket; File Explorer is unchanged, and
+  quitting returns every icon to its original spot. The README opens with the same notice.
+
 ## [1.0.1] - 2026-10-02
 
 ### Fixed
@@ -129,6 +137,7 @@ All notable changes to Pickets are documented here. Versions follow
 - Connected pickets now keep a single shared size, resize together from the group's outside
   boundary, and automatically close small gaps left by older layouts.
 
-[Unreleased]: https://github.com/Creeptones/Pickets/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/Creeptones/Pickets/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/Creeptones/Pickets/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Creeptones/Pickets/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Creeptones/Pickets/releases/tag/v1.0.0
