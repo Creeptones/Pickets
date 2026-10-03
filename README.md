@@ -4,6 +4,13 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Windows 10/11](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4.svg)](#requirements)
 
+> [!IMPORTANT]
+> **Pickets changes how your desktop looks, not where your files live.** Nothing is moved,
+> copied, or renamed. Your files stay in their original folders, and File Explorer shows them
+> exactly as before. When you drop a desktop icon into a picket, Pickets just hides that icon
+> from the desktop and shows it inside the picket. Quit Pickets and every icon goes back to
+> the exact spot it came from.
+
 **A tidy desktop, with your files right where you left them.**
 
 Pickets organizes files, folders, and shortcuts into movable desktop groups. Collapse them

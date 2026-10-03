@@ -1,3 +1,12 @@
+HOW PICKETS WORKS: YOUR FILES DO NOT MOVE
+
+Pickets changes how your desktop looks, not where your files live. When you drop a desktop icon
+into a picket, the file stays in its original folder, and File Explorer shows it exactly as
+before. Pickets only hides that icon from the desktop and shows it inside the picket instead.
+
+Choose Quit Pickets from the tray icon and every captured icon goes back to the exact spot it came
+from. Nothing needs to be undone, because your files were never touched.
+
 Pickets setup is intentionally small and transparent.
 The setup wrapper is built with the open-source Inno Setup project.
 
